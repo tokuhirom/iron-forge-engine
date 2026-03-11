@@ -3,11 +3,15 @@ import { GAME_WIDTH, GAME_HEIGHT } from "../constants";
 import { resumeAudio } from "../audio";
 
 export class TitleScene extends Phaser.Scene {
+  private ready = false;
+
   constructor() {
     super({ key: "TitleScene" });
   }
 
   create(): void {
+    this.ready = false;
+
     // タイトル
     this.add
       .text(GAME_WIDTH / 2, 100, "鉄塊機関", {
@@ -84,14 +88,18 @@ export class TitleScene extends Phaser.Scene {
       })
       .setOrigin(0.5);
 
-    // 遅延させてゲームオーバー画面からのタップ誤爆を防止
-    let ready = false;
-    this.time.delayedCall(800, () => { ready = true; });
-
-    this.input.on("pointerdown", () => {
-      if (!ready) return;
+    // 画面全体をタップ可能なゾーンにする
+    const zone = this.add.zone(GAME_WIDTH / 2, GAME_HEIGHT / 2, GAME_WIDTH, GAME_HEIGHT);
+    zone.setInteractive();
+    zone.on("pointerdown", () => {
+      if (!this.ready) return;
       resumeAudio();
       this.scene.start("GameScene");
+    });
+
+    // 誤爆防止: 800ms 後に有効化
+    this.time.delayedCall(800, () => {
+      this.ready = true;
     });
   }
 }
