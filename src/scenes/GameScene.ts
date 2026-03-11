@@ -1,5 +1,5 @@
 import Phaser from "phaser";
-import { playShoot, playLand, playShip, playGameOver, playSpeedUp, startBGM, speedUpBGM, stopBGM } from "../audio";
+import { playShoot, playLand, playShip, playGameOver, playSpeedUp, startBGM, speedUpBGM, stopBGM, isMuted, setMuted, restoreMuteSetting } from "../audio";
 import {
   GAME_WIDTH,
   GAME_HEIGHT,
@@ -85,6 +85,9 @@ export class GameScene extends Phaser.Scene {
     this.groups.clear();
     this.nextGroupId = 1;
 
+    // ミュート設定を復元
+    restoreMuteSetting();
+
     // BGMを最初に開始（遅延なし）
     startBGM();
 
@@ -132,6 +135,7 @@ export class GameScene extends Phaser.Scene {
     this.spawnGroup();
     this.setupInput();
     this.createPauseButton();
+    this.createSoundButton();
 
     const hint = this.add
       .text(GAME_WIDTH / 2, GAME_HEIGHT / 2 - 40,
@@ -161,6 +165,22 @@ export class GameScene extends Phaser.Scene {
     });
   }
 
+  private createSoundButton(): void {
+    this.soundBtn = this.add.text(GAME_WIDTH - 40, 10, isMuted() ? "\u{1F507}" : "\u{1F50A}", {
+      fontSize: "24px", color: "#8899aa",
+      stroke: "#000000", strokeThickness: 2,
+      resolution: this.textRes,
+    }).setOrigin(1, 0).setDepth(50).setInteractive({ useHandCursor: true });
+
+    this.soundBtn.on("pointerdown", (pointer: Phaser.Input.Pointer) => {
+      pointer.event.stopPropagation();
+      if (this.gameOver) return;
+      const newMuted = !isMuted();
+      setMuted(newMuted);
+      this.soundBtn.setText(newMuted ? "\u{1F507}" : "\u{1F50A}");
+    });
+  }
+
   private togglePause(): void {
     if (this.paused) {
       this.resumeGame();
@@ -169,6 +189,7 @@ export class GameScene extends Phaser.Scene {
     }
   }
 
+  private soundBtn!: Phaser.GameObjects.Text;
   private pauseOverlay: Phaser.GameObjects.Rectangle | null = null;
   private pauseText: Phaser.GameObjects.Text | null = null;
 

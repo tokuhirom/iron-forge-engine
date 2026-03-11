@@ -1,5 +1,6 @@
 /** Web Audio API で簡易効果音を動的生成 */
 let audioCtx: AudioContext | null = null;
+let muted = false;
 
 function getAudioCtx(): AudioContext {
   if (!audioCtx) {
@@ -16,8 +17,34 @@ export function resumeAudio(): void {
   }
 }
 
+/** ミュート状態を取得 */
+export function isMuted(): boolean {
+  return muted;
+}
+
+/** ミュート切り替え。BGMも連動して停止/再開する */
+export function setMuted(val: boolean): void {
+  muted = val;
+  try {
+    localStorage.setItem("iron-forge-muted", val ? "1" : "0");
+  } catch { /* ignore */ }
+  if (val) {
+    stopBGM();
+  } else if (bgmPlaying) {
+    scheduleBGMLoop();
+  }
+}
+
+/** localStorageからミュート設定を復元 */
+export function restoreMuteSetting(): void {
+  try {
+    muted = localStorage.getItem("iron-forge-muted") === "1";
+  } catch { /* ignore */ }
+}
+
 /** 射出音: 短い「ポン」 */
 export function playShoot(): void {
+  if (muted) return;
   const ctx = getAudioCtx();
   const osc = ctx.createOscillator();
   const gain = ctx.createGain();
@@ -36,6 +63,7 @@ export function playShoot(): void {
 
 /** 着弾音: 「カチッ」 */
 export function playLand(): void {
+  if (muted) return;
   const ctx = getAudioCtx();
   const osc = ctx.createOscillator();
   const gain = ctx.createGain();
@@ -54,6 +82,7 @@ export function playLand(): void {
 
 /** 出荷音: 上昇する「ピロリン」 */
 export function playShip(big: boolean): void {
+  if (muted) return;
   const ctx = getAudioCtx();
 
   const notes = big
@@ -79,6 +108,7 @@ export function playShip(big: boolean): void {
 
 /** スピードアップ警告音: 上昇する「ビビビッ！」 */
 export function playSpeedUp(): void {
+  if (muted) return;
   const ctx = getAudioCtx();
 
   // 警告的な上昇音を3段
@@ -172,6 +202,7 @@ document.addEventListener("visibilitychange", () => {
 });
 
 function playBGMBar(): void {
+  if (muted) return;
   const ctx = getAudioCtx();
   const beatSec = 60 / bgmBpm;
 
@@ -231,6 +262,7 @@ function playBGMBar(): void {
 
 /** ゲームオーバー音: 重い「ドゥーン ドゥーン ドゥーン」×3連 */
 export function playGameOver(): void {
+  if (muted) return;
   const ctx = getAudioCtx();
 
   for (let i = 0; i < 3; i++) {
