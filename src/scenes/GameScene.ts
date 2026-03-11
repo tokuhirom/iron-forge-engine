@@ -381,16 +381,9 @@ export class GameScene extends Phaser.Scene {
       if (row < 0 || row >= GRID_ROWS) continue;
       const col = fb.col;
 
-      // 1) グループの穴に入った → 充填
-      const holeGroupId = this.getHoleGroupId(row, col);
-      if (holeGroupId !== null) {
-        this.landBlockOnGrid(row, col, holeGroupId);
-        fb.sprite.destroy();
-        toRemove.push(i);
-        continue;
-      }
-
-      // 2) 既存ブロックに衝突 → 1つ下に着弾
+      // 既存ブロックに衝突 → 1つ下に着弾
+      // （穴はバウンディングボックス内の空セルだが、飛行中は無視する。
+      //   非対称拡張時に意図しない位置に着弾するバグを防ぐため）
       if (this.gridState[row][col] !== 0) {
         const landRow = row + 1;
         if (landRow < GRID_ROWS && this.gridState[landRow][col] === 0) {
@@ -716,22 +709,18 @@ export class GameScene extends Phaser.Scene {
       this.aimLineGraphics.lineBetween(x, y, x, Math.max(y - dashLen, 0));
     }
 
-    // 着弾予測: 下から上にスキャンして最初に当たるもの
+    // 着弾予測: 下から上にスキャンして最初に当たるブロックを探す
     let targetRow = -1;
     let targetType: "hole" | "land" | "none" = "none";
 
     for (let r = GRID_ROWS - 1; r >= 0; r--) {
-      const holeGroup = this.getHoleGroupId(r, clampedCol);
-      if (holeGroup !== null) {
-        targetRow = r;
-        targetType = "hole";
-        break;
-      }
       if (this.gridState[r][clampedCol] !== 0) {
         // ブロックに当たる → 1つ下に着弾
         if (r + 1 < GRID_ROWS && this.gridState[r + 1][clampedCol] === 0) {
           targetRow = r + 1;
-          targetType = "land";
+          // 着弾先がグループの穴なら穴表示
+          const holeGroup = this.getHoleGroupId(r + 1, clampedCol);
+          targetType = holeGroup !== null ? "hole" : "land";
         }
         break;
       }
