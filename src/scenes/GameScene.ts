@@ -9,17 +9,25 @@ import {
   CANNON_WIDTH,
   CANNON_HEIGHT,
   BULLET_SPEED,
-  BULLET_RADIUS,
   SCRAP_SPAWN_INTERVAL,
   GRAVITY_INTERVAL,
+  MIN_RECT_AREA,
   BASE_SCORE,
   CHAIN_MULTIPLIER,
+  TETROMINOS,
   COLORS,
 } from "../constants";
 
+/** 射出中の弾ブロック */
+interface FlyingBlock {
+  sprite: Phaser.GameObjects.Rectangle;
+  col: number; // 射出した列（固定）
+}
+
 export class GameScene extends Phaser.Scene {
   private cannon!: Phaser.GameObjects.Rectangle;
-  private bullets: Phaser.GameObjects.Arc[] = [];
+  private cannonPreview!: Phaser.GameObjects.Rectangle;
+  private flyingBlocks: FlyingBlock[] = [];
   private grid: (Phaser.GameObjects.Rectangle | null)[][] = [];
   private gridState: boolean[][] = [];
   private score = 0;
@@ -42,7 +50,7 @@ export class GameScene extends Phaser.Scene {
     this.score = 0;
     this.chain = 0;
     this.gameOver = false;
-    this.bullets = [];
+    this.flyingBlocks = [];
 
     // グリッド初期化
     this.gridState = Array.from({ length: GRID_ROWS }, () =>
@@ -52,7 +60,6 @@ export class GameScene extends Phaser.Scene {
       Array(GRID_COLS).fill(null)
     );
 
-    // グリッド線描画
     this.drawGridLines();
 
     // 砲台
@@ -63,6 +70,17 @@ export class GameScene extends Phaser.Scene {
       CANNON_HEIGHT,
       COLORS.cannon
     );
+    this.cannon.setStrokeStyle(2, 0x997733);
+
+    // 砲台上のプレビュー（次に射出されるブロック）
+    this.cannonPreview = this.add.rectangle(
+      this.cannon.x,
+      CANNON_Y - CANNON_HEIGHT / 2 - CELL_SIZE / 2,
+      CELL_SIZE - 2,
+      CELL_SIZE - 2,
+      COLORS.bullet
+    );
+    this.cannonPreview.setAlpha(0.6);
 
     // スコア表示
     this.scoreText = this.add.text(10, 10, "SCORE: 0", {
@@ -71,15 +89,13 @@ export class GameScene extends Phaser.Scene {
       color: COLORS.text,
     });
 
-    // スクラップ生成タイマー
+    // タイマー
     this.spawnTimer = this.time.addEvent({
       delay: SCRAP_SPAWN_INTERVAL,
-      callback: this.spawnScrap,
+      callback: this.spawnTetromino,
       callbackScope: this,
       loop: true,
     });
-
-    // 重力タイマー
     this.gravityTimer = this.time.addEvent({
       delay: GRAVITY_INTERVAL,
       callback: this.applyGravity,
@@ -87,29 +103,28 @@ export class GameScene extends Phaser.Scene {
       loop: true,
     });
 
-    // 初回スクラップ
-    this.spawnScrap();
+    // 初回テトロミノ
+    this.spawnTetromino();
 
-    // 入力設定
     this.setupInput();
 
     // 開始時ヒント
     const hint = this.add
-      .text(GAME_WIDTH / 2, GAME_HEIGHT / 2 - 40, "弾を当てて四角形を作ろう！", {
+      .text(GAME_WIDTH / 2, GAME_HEIGHT / 2 - 40, "ブロックを撃って\n四角形を完成させよう！", {
         fontFamily: "monospace",
         fontSize: "16px",
         color: "#ffee88",
         stroke: "#000000",
         strokeThickness: 3,
+        align: "center",
       })
-      .setOrigin(0.5)
-      .setAlpha(1);
+      .setOrigin(0.5);
 
     this.tweens.add({
       targets: hint,
       alpha: 0,
-      delay: 2000,
-      duration: 1000,
+      delay: 2500,
+      duration: 800,
       onComplete: () => hint.destroy(),
     });
   }
@@ -123,6 +138,9 @@ export class GameScene extends Phaser.Scene {
     for (let r = 0; r <= GRID_ROWS; r++) {
       graphics.lineBetween(0, r * CELL_SIZE, GRID_COLS * CELL_SIZE, r * CELL_SIZE);
     }
+    // 砲台エリアの区切り線
+    graphics.lineStyle(2, 0x555577, 0.5);
+    graphics.lineBetween(0, GRID_ROWS * CELL_SIZE, GAME_WIDTH, GRID_ROWS * CELL_SIZE);
   }
 
   private setupInput(): void {
@@ -137,11 +155,13 @@ export class GameScene extends Phaser.Scene {
       const dx = pointer.x - this.touchStartX;
       if (Math.abs(dx) > this.swipeThreshold) {
         this.isSwiping = true;
+        // セル単位でスナップ移動
         this.cannon.x = Phaser.Math.Clamp(
           this.cannon.x + dx,
-          CANNON_WIDTH / 2,
-          GAME_WIDTH - CANNON_WIDTH / 2
+          CELL_SIZE / 2,
+          GRID_COLS * CELL_SIZE - CELL_SIZE / 2
         );
+        this.cannonPreview.x = this.cannon.x;
         this.touchStartX = pointer.x;
       }
     });
@@ -155,26 +175,36 @@ export class GameScene extends Phaser.Scene {
   }
 
   private shoot(): void {
-    const bullet = this.add.circle(
-      this.cannon.x,
-      CANNON_Y - CANNON_HEIGHT / 2,
-      BULLET_RADIUS,
+    // 砲台の位置から列を決定
+    const col = Math.floor(this.cannon.x / CELL_SIZE);
+    const clampedCol = Phaser.Math.Clamp(col, 0, GRID_COLS - 1);
+    const x = clampedCol * CELL_SIZE + CELL_SIZE / 2;
+
+    const sprite = this.add.rectangle(
+      x,
+      CANNON_Y - CANNON_HEIGHT / 2 - CELL_SIZE / 2,
+      CELL_SIZE - 2,
+      CELL_SIZE - 2,
       COLORS.bullet
     );
-    this.bullets.push(bullet);
+    sprite.setStrokeStyle(1, 0xaa6622);
+
+    this.flyingBlocks.push({ sprite, col: clampedCol });
   }
 
-  private spawnScrap(): void {
+  private spawnTetromino(): void {
     if (this.gameOver) return;
 
-    // ランダムな列にスクラップを配置
-    const col = Phaser.Math.Between(0, GRID_COLS - 1);
-    const width = Phaser.Math.Between(1, 3); // 1〜3セル幅
-    const startCol = Phaser.Math.Clamp(col, 0, GRID_COLS - width);
+    const tetro = Phaser.Math.RND.pick(TETROMINOS);
+    const startCol = Phaser.Math.Between(0, GRID_COLS - 3);
 
-    for (let c = startCol; c < startCol + width; c++) {
-      if (!this.gridState[0][c]) {
-        this.placeBlock(0, c);
+    for (const [dr, dc] of tetro.cells) {
+      const r = dr;
+      const c = startCol + dc;
+      if (c >= 0 && c < GRID_COLS && r >= 0 && r < GRID_ROWS) {
+        if (!this.gridState[r][c]) {
+          this.placeBlock(r, c);
+        }
       }
     }
   }
@@ -191,7 +221,7 @@ export class GameScene extends Phaser.Scene {
       CELL_SIZE - 2,
       COLORS.scrap
     );
-    rect.setStrokeStyle(1, 0x444466);
+    rect.setStrokeStyle(1, 0x445566);
     this.grid[row][col] = rect;
   }
 
@@ -206,74 +236,87 @@ export class GameScene extends Phaser.Scene {
 
   update(_time: number, delta: number): void {
     if (this.gameOver) return;
-
-    this.updateBullets(delta);
+    this.updateFlyingBlocks(delta);
     this.checkGameOver();
   }
 
-  private updateBullets(delta: number): void {
+  private updateFlyingBlocks(delta: number): void {
     const dt = delta / 1000;
     const toRemove: number[] = [];
 
-    for (let i = 0; i < this.bullets.length; i++) {
-      const bullet = this.bullets[i];
-      bullet.y -= BULLET_SPEED * dt;
+    for (let i = 0; i < this.flyingBlocks.length; i++) {
+      const fb = this.flyingBlocks[i];
+      fb.sprite.y -= BULLET_SPEED * dt;
 
-      // 画面外
-      if (bullet.y < 0) {
+      // この弾ブロックが着地する行を判定
+      const row = Math.floor(fb.sprite.y / CELL_SIZE);
+
+      // 画面外に出た → 最上行に配置
+      if (fb.sprite.y < 0) {
+        this.landBlock(0, fb.col);
+        fb.sprite.destroy();
         toRemove.push(i);
         continue;
       }
 
-      // グリッドとの衝突判定
-      const col = Math.floor(bullet.x / CELL_SIZE);
-      const row = Math.floor(bullet.y / CELL_SIZE);
-
+      // グリッド内のブロックに衝突 → その1つ下の行に配置
       if (
         row >= 0 &&
         row < GRID_ROWS &&
-        col >= 0 &&
-        col < GRID_COLS &&
-        this.gridState[row][col]
+        this.gridState[row][fb.col]
       ) {
-        // 弾が当たったブロックの左右に拡張
-        this.expandScrap(row, col);
+        const landRow = row + 1;
+        if (landRow < GRID_ROWS && !this.gridState[landRow][fb.col]) {
+          this.landBlock(landRow, fb.col);
+        }
+        // 配置できなくても弾は消える
+        fb.sprite.destroy();
         toRemove.push(i);
+        continue;
       }
     }
 
-    // 弾の削除（逆順）
     for (let i = toRemove.length - 1; i >= 0; i--) {
-      this.bullets[toRemove[i]].destroy();
-      this.bullets.splice(toRemove[i], 1);
+      this.flyingBlocks.splice(toRemove[i], 1);
     }
   }
 
-  private expandScrap(row: number, col: number): void {
-    // 左右に1セルずつ拡張
-    if (col > 0 && !this.gridState[row][col - 1]) {
-      this.placeBlock(row, col - 1);
-    }
-    if (col < GRID_COLS - 1 && !this.gridState[row][col + 1]) {
-      this.placeBlock(row, col + 1);
-    }
+  /** 弾ブロックがグリッドに着地 */
+  private landBlock(row: number, col: number): void {
+    if (row < 0 || row >= GRID_ROWS || col < 0 || col >= GRID_COLS) return;
+    if (this.gridState[row][col]) return;
+
+    this.placeBlock(row, col);
+
+    // 着地エフェクト（軽い光）
+    const flash = this.add.rectangle(
+      col * CELL_SIZE + CELL_SIZE / 2,
+      row * CELL_SIZE + CELL_SIZE / 2,
+      CELL_SIZE,
+      CELL_SIZE,
+      0xffffff,
+      0.4
+    );
+    this.tweens.add({
+      targets: flash,
+      alpha: 0,
+      duration: 200,
+      onComplete: () => flash.destroy(),
+    });
 
     // 矩形チェック
     this.checkAndClearRectangles();
   }
 
   private checkAndClearRectangles(): void {
-    // 全行・列を走査して矩形（2x2以上の塗りつぶし矩形）を探す
     let found = false;
 
     for (let r = 0; r < GRID_ROWS; r++) {
       for (let c = 0; c < GRID_COLS; c++) {
         if (!this.gridState[r][c]) continue;
 
-        // この位置を左上とする最大矩形を探す
         const rect = this.findLargestRect(r, c);
-        if (rect && rect.area >= 4) {
-          // 最低2x2
+        if (rect && rect.area >= MIN_RECT_AREA) {
           this.clearRect(rect.r, rect.c, rect.w, rect.h);
           this.addScore(rect.area);
           found = true;
@@ -283,7 +326,6 @@ export class GameScene extends Phaser.Scene {
 
     if (found) {
       this.chain++;
-      // 連鎖チェック（次フレームで再チェック）
       this.time.delayedCall(200, () => this.checkAndClearRectangles());
     } else {
       this.chain = 0;
@@ -295,11 +337,9 @@ export class GameScene extends Phaser.Scene {
     startCol: number
   ): { r: number; c: number; w: number; h: number; area: number } | null {
     let best: { r: number; c: number; w: number; h: number; area: number } | null = null;
-
     let maxWidth = GRID_COLS - startCol;
 
     for (let h = 1; startRow + h <= GRID_ROWS; h++) {
-      // この行で連続するブロックの幅を制限
       let width = 0;
       for (let c = startCol; c < startCol + maxWidth; c++) {
         if (this.gridState[startRow + h - 1][c]) {
@@ -312,7 +352,7 @@ export class GameScene extends Phaser.Scene {
       if (maxWidth === 0) break;
 
       const area = maxWidth * h;
-      if (area >= 4 && (!best || area > best.area)) {
+      if (area >= MIN_RECT_AREA && (!best || area > best.area)) {
         best = { r: startRow, c: startCol, w: maxWidth, h, area };
       }
     }
@@ -321,23 +361,23 @@ export class GameScene extends Phaser.Scene {
   }
 
   private clearRect(r: number, c: number, w: number, h: number): void {
-    // 矩形全体を囲むフラッシュ枠
     const rectX = c * CELL_SIZE;
     const rectY = r * CELL_SIZE;
     const rectW = w * CELL_SIZE;
     const rectH = h * CELL_SIZE;
 
+    // フラッシュ枠
     const flash = this.add.rectangle(
       rectX + rectW / 2,
       rectY + rectH / 2,
       rectW,
       rectH,
-      0xffff66,
+      COLORS.shipFlash,
       0.5
     );
-    flash.setStrokeStyle(3, 0xffcc00);
+    flash.setStrokeStyle(3, COLORS.shipStroke);
 
-    // 「出荷！」テキスト演出
+    // 「出荷！」テキスト
     const label = this.add
       .text(rectX + rectW / 2, rectY + rectH / 2, "出荷！", {
         fontFamily: "monospace",
@@ -348,14 +388,12 @@ export class GameScene extends Phaser.Scene {
       })
       .setOrigin(0.5);
 
-    // フラッシュ → フェードアウト
     this.tweens.add({
       targets: flash,
       alpha: 0,
       duration: 400,
       onComplete: () => flash.destroy(),
     });
-
     this.tweens.add({
       targets: label,
       y: label.y - 30,
@@ -364,7 +402,6 @@ export class GameScene extends Phaser.Scene {
       onComplete: () => label.destroy(),
     });
 
-    // ブロック削除
     for (let row = r; row < r + h; row++) {
       for (let col = c; col < c + w; col++) {
         this.removeBlock(row, col);
@@ -380,18 +417,14 @@ export class GameScene extends Phaser.Scene {
 
   private applyGravity(): void {
     if (this.gameOver) return;
-    // 下の行から上に向かって処理（重力）
     for (let r = GRID_ROWS - 2; r >= 0; r--) {
       for (let c = 0; c < GRID_COLS; c++) {
         if (this.gridState[r][c] && !this.gridState[r + 1][c]) {
-          // 1セル落下
           const block = this.grid[r][c];
           this.gridState[r][c] = false;
           this.grid[r][c] = null;
-
           this.gridState[r + 1][c] = true;
           this.grid[r + 1][c] = block;
-
           if (block) {
             block.y = (r + 1) * CELL_SIZE + CELL_SIZE / 2;
           }
@@ -401,7 +434,6 @@ export class GameScene extends Phaser.Scene {
   }
 
   private checkGameOver(): void {
-    // 最下行にブロックがあればゲームオーバー
     const bottomRow = GRID_ROWS - 1;
     for (let c = 0; c < GRID_COLS; c++) {
       if (this.gridState[bottomRow][c]) {
@@ -415,7 +447,7 @@ export class GameScene extends Phaser.Scene {
   }
 
   private showGameOver(): void {
-    const overlay = this.add.rectangle(
+    this.add.rectangle(
       GAME_WIDTH / 2,
       GAME_HEIGHT / 2,
       GAME_WIDTH,
@@ -424,30 +456,30 @@ export class GameScene extends Phaser.Scene {
       0.7
     );
 
-    this.add.text(GAME_WIDTH / 2, GAME_HEIGHT / 2 - 60, "GAME OVER", {
-      fontFamily: "monospace",
-      fontSize: "36px",
-      color: "#ff4444",
-    }).setOrigin(0.5);
+    this.add
+      .text(GAME_WIDTH / 2, GAME_HEIGHT / 2 - 60, "GAME OVER", {
+        fontFamily: "monospace",
+        fontSize: "36px",
+        color: "#ff4444",
+      })
+      .setOrigin(0.5);
 
-    this.add.text(GAME_WIDTH / 2, GAME_HEIGHT / 2, `SCORE: ${this.score}`, {
-      fontFamily: "monospace",
-      fontSize: "24px",
-      color: COLORS.text,
-    }).setOrigin(0.5);
+    this.add
+      .text(GAME_WIDTH / 2, GAME_HEIGHT / 2, `SCORE: ${this.score}`, {
+        fontFamily: "monospace",
+        fontSize: "24px",
+        color: COLORS.text,
+      })
+      .setOrigin(0.5);
 
-    const restartText = this.add.text(
-      GAME_WIDTH / 2,
-      GAME_HEIGHT / 2 + 60,
-      "TAP TO RESTART",
-      {
+    const restartText = this.add
+      .text(GAME_WIDTH / 2, GAME_HEIGHT / 2 + 60, "TAP TO RESTART", {
         fontFamily: "monospace",
         fontSize: "20px",
         color: "#88aaff",
-      }
-    ).setOrigin(0.5);
+      })
+      .setOrigin(0.5);
 
-    // 点滅
     this.tweens.add({
       targets: restartText,
       alpha: 0.3,
@@ -457,7 +489,7 @@ export class GameScene extends Phaser.Scene {
     });
 
     this.input.once("pointerup", () => {
-      this.scene.restart();
+      this.scene.start("TitleScene");
     });
   }
 }
