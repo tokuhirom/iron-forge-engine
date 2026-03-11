@@ -169,7 +169,6 @@ export class GameScene extends Phaser.Scene {
 
   private pauseGame(): void {
     this.paused = true;
-    this.scene.pause();
     stopBGM();
 
     // ブロックを隠す（考えられないように）
@@ -188,7 +187,7 @@ export class GameScene extends Phaser.Scene {
     // オーバーレイ
     this.pauseOverlay = this.add.rectangle(
       GAME_WIDTH / 2, GAME_HEIGHT / 2, GAME_WIDTH, GAME_HEIGHT, 0x000000, 0.8
-    ).setDepth(60);
+    ).setDepth(60).setInteractive();
 
     this.pauseText = this.add.text(GAME_WIDTH / 2, GAME_HEIGHT / 2, "PAUSE\n\nタップで再開", {
       fontFamily: "'Hiragino Kaku Gothic ProN', 'Noto Sans JP', sans-serif",
@@ -198,11 +197,9 @@ export class GameScene extends Phaser.Scene {
       resolution: this.textRes,
     }).setOrigin(0.5).setDepth(61);
 
-    // scene.pause()するとinputも止まるので、resume用にsceneイベントを使う
-    this.scene.resume();
-    // inputをポーズ解除用に限定
-    this.input.once("pointerdown", () => {
-      if (this.paused) this.resumeGame();
+    // オーバーレイをタップで再開（オーバーレイがinputを吸収するので他の操作は届かない）
+    this.pauseOverlay.once("pointerdown", () => {
+      this.resumeGame();
     });
   }
 
