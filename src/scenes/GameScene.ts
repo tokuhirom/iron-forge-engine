@@ -73,6 +73,13 @@ export class GameScene extends Phaser.Scene {
   private keySpace!: Phaser.Input.Keyboard.Key;
   private keyEsc!: Phaser.Input.Keyboard.Key;
 
+  // 長押しリピート用
+  private repeatDir: -1 | 1 | 0 = 0;
+  private repeatTimer: ReturnType<typeof setTimeout> | null = null;
+  private repeatInterval: ReturnType<typeof setInterval> | null = null;
+  private readonly REPEAT_DELAY = 300; // ms: 長押し開始までの遅延
+  private readonly REPEAT_RATE = 80;   // ms: リピート間隔
+
   constructor() {
     super({ key: "GameScene" });
   }
@@ -289,20 +296,24 @@ export class GameScene extends Phaser.Scene {
 
       this.cursors.left.on("down", () => {
         if (this.gameOver || this.paused) return;
-        this.moveCannon(-1);
+        this.startRepeat(-1);
       });
+      this.cursors.left.on("up", () => { if (this.repeatDir === -1) this.stopRepeat(); });
       this.cursors.right.on("down", () => {
         if (this.gameOver || this.paused) return;
-        this.moveCannon(1);
+        this.startRepeat(1);
       });
+      this.cursors.right.on("up", () => { if (this.repeatDir === 1) this.stopRepeat(); });
       this.keyA.on("down", () => {
         if (this.gameOver || this.paused) return;
-        this.moveCannon(-1);
+        this.startRepeat(-1);
       });
+      this.keyA.on("up", () => { if (this.repeatDir === -1) this.stopRepeat(); });
       this.keyD.on("down", () => {
         if (this.gameOver || this.paused) return;
-        this.moveCannon(1);
+        this.startRepeat(1);
       });
+      this.keyD.on("up", () => { if (this.repeatDir === 1) this.stopRepeat(); });
       this.keySpace.on("down", () => {
         if (this.gameOver || this.paused) return;
         this.shoot();
@@ -363,25 +374,29 @@ export class GameScene extends Phaser.Scene {
     const btnH = 40;
 
     // 左ボタン
-    this.add.rectangle(30, padY, btnW, btnH, 0x334455, 0.8)
+    const leftBtn = this.add.rectangle(30, padY, btnW, btnH, 0x334455, 0.8)
       .setDepth(50).setStrokeStyle(1, 0x556677)
-      .setInteractive({ useHandCursor: true })
-      .on("pointerdown", () => {
-        if (this.gameOver || this.paused) return;
-        this.moveCannon(-1);
-      });
+      .setInteractive({ useHandCursor: true });
+    leftBtn.on("pointerdown", () => {
+      if (this.gameOver || this.paused) return;
+      this.startRepeat(-1);
+    });
+    leftBtn.on("pointerup", () => { if (this.repeatDir === -1) this.stopRepeat(); });
+    leftBtn.on("pointerout", () => { if (this.repeatDir === -1) this.stopRepeat(); });
     this.add.text(30, padY, "\u25C0", {
       fontSize: "22px", color: "#aabbcc", resolution: this.textRes,
     }).setOrigin(0.5).setDepth(51);
 
     // 右ボタン
-    this.add.rectangle(90, padY, btnW, btnH, 0x334455, 0.8)
+    const rightBtn = this.add.rectangle(90, padY, btnW, btnH, 0x334455, 0.8)
       .setDepth(50).setStrokeStyle(1, 0x556677)
-      .setInteractive({ useHandCursor: true })
-      .on("pointerdown", () => {
-        if (this.gameOver || this.paused) return;
-        this.moveCannon(1);
-      });
+      .setInteractive({ useHandCursor: true });
+    rightBtn.on("pointerdown", () => {
+      if (this.gameOver || this.paused) return;
+      this.startRepeat(1);
+    });
+    rightBtn.on("pointerup", () => { if (this.repeatDir === 1) this.stopRepeat(); });
+    rightBtn.on("pointerout", () => { if (this.repeatDir === 1) this.stopRepeat(); });
     this.add.text(90, padY, "\u25B6", {
       fontSize: "22px", color: "#aabbcc", resolution: this.textRes,
     }).setOrigin(0.5).setDepth(51);
@@ -405,6 +420,26 @@ export class GameScene extends Phaser.Scene {
     const col = Math.floor(this.cannon.x / CELL_SIZE);
     const newCol = Phaser.Math.Clamp(col + dir, 0, GRID_COLS - 1);
     this.cannon.x = newCol * CELL_SIZE + CELL_SIZE / 2;
+  }
+
+  /** 長押しリピート開始: 即1マス移動し、REPEAT_DELAY後に連続移動 */
+  private startRepeat(dir: -1 | 1): void {
+    this.stopRepeat();
+    this.repeatDir = dir;
+    this.moveCannon(dir);
+    this.repeatTimer = setTimeout(() => {
+      this.repeatInterval = setInterval(() => {
+        if (this.gameOver || this.paused) { this.stopRepeat(); return; }
+        this.moveCannon(dir);
+      }, this.REPEAT_RATE);
+    }, this.REPEAT_DELAY);
+  }
+
+  /** 長押しリピート停止 */
+  private stopRepeat(): void {
+    this.repeatDir = 0;
+    if (this.repeatTimer !== null) { clearTimeout(this.repeatTimer); this.repeatTimer = null; }
+    if (this.repeatInterval !== null) { clearInterval(this.repeatInterval); this.repeatInterval = null; }
   }
 
 
