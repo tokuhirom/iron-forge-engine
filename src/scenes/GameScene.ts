@@ -10,8 +10,8 @@ import {
   CANNON_HEIGHT,
   BULLET_SPEED,
   BULLET_RADIUS,
-  SCRAP_FALL_SPEED,
   SCRAP_SPAWN_INTERVAL,
+  GRAVITY_INTERVAL,
   BASE_SCORE,
   CHAIN_MULTIPLIER,
   COLORS,
@@ -26,6 +26,7 @@ export class GameScene extends Phaser.Scene {
   private chain = 0;
   private scoreText!: Phaser.GameObjects.Text;
   private spawnTimer!: Phaser.Time.TimerEvent;
+  private gravityTimer!: Phaser.Time.TimerEvent;
   private gameOver = false;
 
   // タッチ入力用
@@ -74,6 +75,14 @@ export class GameScene extends Phaser.Scene {
     this.spawnTimer = this.time.addEvent({
       delay: SCRAP_SPAWN_INTERVAL,
       callback: this.spawnScrap,
+      callbackScope: this,
+      loop: true,
+    });
+
+    // 重力タイマー
+    this.gravityTimer = this.time.addEvent({
+      delay: GRAVITY_INTERVAL,
+      callback: this.applyGravity,
       callbackScope: this,
       loop: true,
     });
@@ -179,7 +188,6 @@ export class GameScene extends Phaser.Scene {
     if (this.gameOver) return;
 
     this.updateBullets(delta);
-    this.applyGravity(delta);
     this.checkGameOver();
   }
 
@@ -320,7 +328,8 @@ export class GameScene extends Phaser.Scene {
     this.scoreText.setText(`SCORE: ${this.score}`);
   }
 
-  private applyGravity(_delta: number): void {
+  private applyGravity(): void {
+    if (this.gameOver) return;
     // 下の行から上に向かって処理（重力）
     for (let r = GRID_ROWS - 2; r >= 0; r--) {
       for (let c = 0; c < GRID_COLS; c++) {
@@ -348,6 +357,7 @@ export class GameScene extends Phaser.Scene {
       if (this.gridState[bottomRow][c]) {
         this.gameOver = true;
         this.spawnTimer.remove();
+        this.gravityTimer.remove();
         this.showGameOver();
         return;
       }
