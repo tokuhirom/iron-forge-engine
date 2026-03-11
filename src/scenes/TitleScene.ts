@@ -1,5 +1,5 @@
 import Phaser from "phaser";
-import { GAME_WIDTH, GAME_HEIGHT } from "../constants";
+import { GAME_WIDTH } from "../constants";
 import type { ControlMode } from "../constants";
 import { resumeAudio } from "../audio";
 
