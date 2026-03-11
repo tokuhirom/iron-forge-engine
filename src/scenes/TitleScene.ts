@@ -1,0 +1,79 @@
+import Phaser from "phaser";
+import { GAME_WIDTH, GAME_HEIGHT, COLORS } from "../constants";
+
+export class TitleScene extends Phaser.Scene {
+  constructor() {
+    super({ key: "TitleScene" });
+  }
+
+  create(): void {
+    // タイトル
+    this.add
+      .text(GAME_WIDTH / 2, 100, "鉄塊機関", {
+        fontFamily: "monospace",
+        fontSize: "36px",
+        color: "#e0d0b0",
+      })
+      .setOrigin(0.5);
+
+    this.add
+      .text(GAME_WIDTH / 2, 145, "―IRON FORGE ENGINE―", {
+        fontFamily: "monospace",
+        fontSize: "14px",
+        color: "#888899",
+      })
+      .setOrigin(0.5);
+
+    // 遊び方
+    const instructions = [
+      "【 遊び方 】",
+      "",
+      "上からスクラップが降ってくる",
+      "",
+      "弾を当てると スクラップが横に伸びる",
+      "",
+      "■■■■",
+      "■■■■  ← 四角形を作ると出荷！",
+      "■■■■",
+      "",
+      "大きい四角形 ＝ 高スコア",
+      "",
+      "",
+      "【 操作 】",
+      "",
+      "スワイプ … 砲台を移動",
+      "タップ   … 弾を発射",
+    ];
+
+    this.add
+      .text(GAME_WIDTH / 2, 340, instructions.join("\n"), {
+        fontFamily: "monospace",
+        fontSize: "14px",
+        color: "#ccbbaa",
+        align: "center",
+        lineSpacing: 4,
+      })
+      .setOrigin(0.5);
+
+    // スタートボタン
+    const startText = this.add
+      .text(GAME_WIDTH / 2, GAME_HEIGHT - 100, "TAP TO START", {
+        fontFamily: "monospace",
+        fontSize: "22px",
+        color: "#88aaff",
+      })
+      .setOrigin(0.5);
+
+    this.tweens.add({
+      targets: startText,
+      alpha: 0.3,
+      duration: 700,
+      yoyo: true,
+      repeat: -1,
+    });
+
+    this.input.once("pointerup", () => {
+      this.scene.start("GameScene");
+    });
+  }
+}

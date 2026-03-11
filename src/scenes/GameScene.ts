@@ -92,6 +92,26 @@ export class GameScene extends Phaser.Scene {
 
     // 入力設定
     this.setupInput();
+
+    // 開始時ヒント
+    const hint = this.add
+      .text(GAME_WIDTH / 2, GAME_HEIGHT / 2 - 40, "弾を当てて四角形を作ろう！", {
+        fontFamily: "monospace",
+        fontSize: "16px",
+        color: "#ffee88",
+        stroke: "#000000",
+        strokeThickness: 3,
+      })
+      .setOrigin(0.5)
+      .setAlpha(1);
+
+    this.tweens.add({
+      targets: hint,
+      alpha: 0,
+      delay: 2000,
+      duration: 1000,
+      onComplete: () => hint.destroy(),
+    });
   }
 
   private drawGridLines(): void {
@@ -301,25 +321,55 @@ export class GameScene extends Phaser.Scene {
   }
 
   private clearRect(r: number, c: number, w: number, h: number): void {
+    // 矩形全体を囲むフラッシュ枠
+    const rectX = c * CELL_SIZE;
+    const rectY = r * CELL_SIZE;
+    const rectW = w * CELL_SIZE;
+    const rectH = h * CELL_SIZE;
+
+    const flash = this.add.rectangle(
+      rectX + rectW / 2,
+      rectY + rectH / 2,
+      rectW,
+      rectH,
+      0xffff66,
+      0.5
+    );
+    flash.setStrokeStyle(3, 0xffcc00);
+
+    // 「出荷！」テキスト演出
+    const label = this.add
+      .text(rectX + rectW / 2, rectY + rectH / 2, "出荷！", {
+        fontFamily: "monospace",
+        fontSize: "20px",
+        color: "#ffee00",
+        stroke: "#442200",
+        strokeThickness: 3,
+      })
+      .setOrigin(0.5);
+
+    // フラッシュ → フェードアウト
+    this.tweens.add({
+      targets: flash,
+      alpha: 0,
+      duration: 400,
+      onComplete: () => flash.destroy(),
+    });
+
+    this.tweens.add({
+      targets: label,
+      y: label.y - 30,
+      alpha: 0,
+      duration: 600,
+      onComplete: () => label.destroy(),
+    });
+
+    // ブロック削除
     for (let row = r; row < r + h; row++) {
       for (let col = c; col < c + w; col++) {
-        // 出荷エフェクト
-        this.steamEffect(col * CELL_SIZE + CELL_SIZE / 2, row * CELL_SIZE + CELL_SIZE / 2);
         this.removeBlock(row, col);
       }
     }
-  }
-
-  private steamEffect(x: number, y: number): void {
-    const particles = this.add.particles(x, y, undefined, {
-      speed: { min: 20, max: 60 },
-      scale: { start: 0.4, end: 0 },
-      lifespan: 400,
-      quantity: 3,
-      emitting: false,
-    });
-    particles.explode();
-    this.time.delayedCall(500, () => particles.destroy());
   }
 
   private addScore(area: number): void {
