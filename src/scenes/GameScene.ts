@@ -17,6 +17,7 @@ import {
   SCRAP_SHAPES,
   COLORS,
 } from "../constants";
+import type { ControlMode } from "../constants";
 
 interface ScrapGroup {
   id: number;
@@ -57,10 +58,17 @@ export class GameScene extends Phaser.Scene {
   private outlineGraphics!: Phaser.GameObjects.Graphics;
   private aimLineGraphics!: Phaser.GameObjects.Graphics;
 
-  // タッチ入力用
+  // 操作モード
+  private controlMode: ControlMode = "direct";
+
+  // スワイプ入力用
   private touchStartX = 0;
   private isSwiping = false;
   private swipeThreshold = 10;
+
+  // 仮想パッド用
+  private vpadMovingLeft = false;
+  private vpadMovingRight = false;
 
   // キーボード入力用
   private cursors!: Phaser.Types.Input.Keyboard.CursorKeys;
@@ -73,7 +81,8 @@ export class GameScene extends Phaser.Scene {
     super({ key: "GameScene" });
   }
 
-  create(): void {
+  create(data?: { controlMode?: ControlMode }): void {
+    this.controlMode = data?.controlMode ?? "direct";
     this.score = 0;
     this.gameOver = false;
     this.flyingBlocks = [];
@@ -240,7 +249,55 @@ export class GameScene extends Phaser.Scene {
   }
 
   private setupInput(): void {
-    // タッチ／マウス入力
+    // モード別タッチ入力
+    switch (this.controlMode) {
+      case "direct":
+        this.setupDirectInput();
+        break;
+      case "swipe":
+        this.setupSwipeInput();
+        break;
+      case "vpad":
+        this.setupVpadInput();
+        break;
+    }
+
+    // 共通キーボード入力
+    if (this.input.keyboard) {
+      this.cursors = this.input.keyboard.createCursorKeys();
+      this.keyA = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.A);
+      this.keyD = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.D);
+      this.keySpace = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.SPACE);
+      this.keyEsc = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.ESC);
+
+      this.keySpace.on("down", () => {
+        if (this.gameOver || this.paused) return;
+        this.shoot();
+      });
+
+      this.keyEsc.on("down", () => {
+        if (this.gameOver) return;
+        this.togglePause();
+      });
+    }
+  }
+
+  /** ダイレクト: タップした列に即発射 */
+  private setupDirectInput(): void {
+    this.input.on("pointerdown", (pointer: Phaser.Input.Pointer) => {
+      if (this.gameOver || this.paused) return;
+      // ポーズボタン領域は無視（右上30×30）
+      if (pointer.x > GAME_WIDTH - 40 && pointer.y < 40) return;
+
+      const col = Math.floor(pointer.x / CELL_SIZE);
+      const clampedCol = Phaser.Math.Clamp(col, 0, GRID_COLS - 1);
+      this.cannon.x = clampedCol * CELL_SIZE + CELL_SIZE / 2;
+      this.shoot();
+    });
+  }
+
+  /** スワイプ: スワイプで砲台移動、タップで発射 */
+  private setupSwipeInput(): void {
     this.input.on("pointerdown", (pointer: Phaser.Input.Pointer) => {
       if (this.gameOver || this.paused) return;
       this.touchStartX = pointer.x;
@@ -264,38 +321,80 @@ export class GameScene extends Phaser.Scene {
       if (this.gameOver || this.paused) return;
       if (!this.isSwiping) this.shoot();
     });
-
-    // キーボード入力
-    if (this.input.keyboard) {
-      this.cursors = this.input.keyboard.createCursorKeys();
-      this.keyA = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.A);
-      this.keyD = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.D);
-      this.keySpace = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.SPACE);
-      this.keyEsc = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.ESC);
-
-      this.keySpace.on("down", () => {
-        if (this.gameOver || this.paused) return;
-        this.shoot();
-      });
-
-      this.keyEsc.on("down", () => {
-        if (this.gameOver) return;
-        this.togglePause();
-      });
-    }
   }
 
-  private updateKeyboardInput(): void {
-    if (!this.input.keyboard || this.gameOver || this.paused) return;
+  /** 仮想パッド: 画面下部に左右ボタン+発射ボタン */
+  private setupVpadInput(): void {
+    const padY = CANNON_Y + 10;
+    const padAlpha = 0.5;
+    const btnSize = 50;
 
-    const moveSpeed = CELL_SIZE * 0.4; // 1フレームあたりの移動量
+    // 左ボタン
+    const leftBtn = this.add.text(20, padY, "\u25C0", {
+      fontSize: "32px", color: "#aabbcc",
+      resolution: this.textRes,
+    }).setOrigin(0, 0.5).setDepth(50).setAlpha(padAlpha)
+      .setInteractive({ useHandCursor: true });
+
+    leftBtn.on("pointerdown", () => {
+      if (this.gameOver || this.paused) return;
+      this.vpadMovingLeft = true;
+    });
+    leftBtn.on("pointerup", () => { this.vpadMovingLeft = false; });
+    leftBtn.on("pointerout", () => { this.vpadMovingLeft = false; });
+
+    // 右ボタン
+    const rightBtn = this.add.text(20 + btnSize + 10, padY, "\u25B6", {
+      fontSize: "32px", color: "#aabbcc",
+      resolution: this.textRes,
+    }).setOrigin(0, 0.5).setDepth(50).setAlpha(padAlpha)
+      .setInteractive({ useHandCursor: true });
+
+    rightBtn.on("pointerdown", () => {
+      if (this.gameOver || this.paused) return;
+      this.vpadMovingRight = true;
+    });
+    rightBtn.on("pointerup", () => { this.vpadMovingRight = false; });
+    rightBtn.on("pointerout", () => { this.vpadMovingRight = false; });
+
+    // 発射ボタン
+    const fireBtn = this.add.text(GAME_WIDTH - 20, padY, "FIRE", {
+      fontFamily: "monospace", fontSize: "22px", color: "#ff8844",
+      stroke: "#000000", strokeThickness: 2,
+      resolution: this.textRes,
+    }).setOrigin(1, 0.5).setDepth(50).setAlpha(padAlpha)
+      .setInteractive({ useHandCursor: true });
+
+    fireBtn.on("pointerdown", () => {
+      if (this.gameOver || this.paused) return;
+      this.shoot();
+    });
+  }
+
+  private updateMovementInput(): void {
+    if (this.gameOver || this.paused) return;
+
+    const moveSpeed = CELL_SIZE * 0.4;
     let moved = false;
 
-    if (this.cursors.left.isDown || this.keyA.isDown) {
+    // キーボード
+    if (this.input.keyboard) {
+      if (this.cursors.left.isDown || this.keyA.isDown) {
+        this.cannon.x -= moveSpeed;
+        moved = true;
+      }
+      if (this.cursors.right.isDown || this.keyD.isDown) {
+        this.cannon.x += moveSpeed;
+        moved = true;
+      }
+    }
+
+    // 仮想パッド
+    if (this.vpadMovingLeft) {
       this.cannon.x -= moveSpeed;
       moved = true;
     }
-    if (this.cursors.right.isDown || this.keyD.isDown) {
+    if (this.vpadMovingRight) {
       this.cannon.x += moveSpeed;
       moved = true;
     }
@@ -495,7 +594,7 @@ export class GameScene extends Phaser.Scene {
 
   update(_time: number, delta: number): void {
     if (this.gameOver || this.paused) return;
-    this.updateKeyboardInput();
+    this.updateMovementInput();
     this.updateFlyingBlocks(delta);
     this.drawAimLine();
     this.checkGameOver();
@@ -1163,7 +1262,7 @@ export class GameScene extends Phaser.Scene {
         for (const el of elements) {
           if (el && "destroy" in el) el.destroy();
         }
-        this.scene.restart();
+        this.scene.restart({ controlMode: this.controlMode });
       });
     });
   }

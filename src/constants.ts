@@ -1,3 +1,6 @@
+// 操作モード
+export type ControlMode = "direct" | "swipe" | "vpad";
+
 // ゲーム画面サイズ（縦画面）
 export const GAME_WIDTH = 390;
 export const GAME_HEIGHT = 700;

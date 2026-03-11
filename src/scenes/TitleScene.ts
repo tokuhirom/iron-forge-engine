@@ -1,10 +1,12 @@
 import Phaser from "phaser";
 import { GAME_WIDTH, GAME_HEIGHT } from "../constants";
+import type { ControlMode } from "../constants";
 import { resumeAudio } from "../audio";
 
 export class TitleScene extends Phaser.Scene {
   private ready = false;
   private readonly textRes = Math.max(2, window.devicePixelRatio || 2);
+  private selectedMode: ControlMode = "direct";
 
   constructor() {
     super({ key: "TitleScene" });
@@ -13,9 +15,17 @@ export class TitleScene extends Phaser.Scene {
   create(): void {
     this.ready = false;
 
+    // 前回の選択を復元
+    try {
+      const saved = localStorage.getItem("iron-forge-control-mode");
+      if (saved === "direct" || saved === "swipe" || saved === "vpad") {
+        this.selectedMode = saved;
+      }
+    } catch { /* ignore */ }
+
     // タイトル
     this.add
-      .text(GAME_WIDTH / 2, 120, "鉄塊機関", {
+      .text(GAME_WIDTH / 2, 80, "鉄塊機関", {
         fontFamily: "'Hiragino Kaku Gothic ProN', 'Noto Sans JP', sans-serif",
         fontSize: "40px",
         color: "#e0d0b0",
@@ -26,7 +36,7 @@ export class TitleScene extends Phaser.Scene {
       .setOrigin(0.5);
 
     this.add
-      .text(GAME_WIDTH / 2, 168, "IRON FORGE ENGINE", {
+      .text(GAME_WIDTH / 2, 125, "IRON FORGE ENGINE", {
         fontFamily: "monospace",
         fontSize: "13px",
         color: "#887766",
@@ -38,7 +48,7 @@ export class TitleScene extends Phaser.Scene {
     // 区切り線
     const line = this.add.graphics();
     line.lineStyle(1, 0x554433, 0.5);
-    line.lineBetween(60, 195, GAME_WIDTH - 60, 195);
+    line.lineBetween(60, 148, GAME_WIDTH - 60, 148);
 
     // 遊び方
     const rules = [
@@ -50,7 +60,7 @@ export class TitleScene extends Phaser.Scene {
     ];
 
     this.add
-      .text(GAME_WIDTH / 2, 270, rules.join("\n"), {
+      .text(GAME_WIDTH / 2, 220, rules.join("\n"), {
         fontFamily: "'Hiragino Kaku Gothic ProN', 'Noto Sans JP', sans-serif",
         fontSize: "15px",
         color: "#ccbbaa",
@@ -60,35 +70,97 @@ export class TitleScene extends Phaser.Scene {
       })
       .setOrigin(0.5);
 
-    // 操作説明
-    const controls = "スワイプ/←→ → 砲台移動\nタップ/Space → 発射";
-
+    // 操作モード選択
     this.add
-      .text(GAME_WIDTH / 2, 400, controls, {
+      .text(GAME_WIDTH / 2, 330, "操作タイプ", {
         fontFamily: "'Hiragino Kaku Gothic ProN', 'Noto Sans JP', sans-serif",
         fontSize: "14px",
         color: "#998877",
-        align: "center",
-        lineSpacing: 6,
+        resolution: this.textRes,
+      })
+      .setOrigin(0.5);
+
+    const modes: { key: ControlMode; label: string; desc: string }[] = [
+      { key: "direct", label: "ダイレクト", desc: "タップした列に発射" },
+      { key: "swipe",  label: "スワイプ",   desc: "スワイプ移動+タップ発射" },
+      { key: "vpad",   label: "仮想パッド", desc: "← → ボタンで移動" },
+    ];
+
+    const btnTexts: Phaser.GameObjects.Text[] = [];
+    const btnBgs: Phaser.GameObjects.Rectangle[] = [];
+
+    const btnW = 110;
+    const btnH = 70;
+    const btnY = 395;
+    const gap = 8;
+    const totalW = btnW * 3 + gap * 2;
+    const startX = (GAME_WIDTH - totalW) / 2 + btnW / 2;
+
+    for (let i = 0; i < modes.length; i++) {
+      const m = modes[i];
+      const x = startX + i * (btnW + gap);
+
+      const bg = this.add.rectangle(x, btnY, btnW, btnH, 0x223344, 1)
+        .setStrokeStyle(2, 0x445566).setInteractive({ useHandCursor: true });
+
+      const label = this.add.text(x, btnY - 12, m.label, {
+        fontFamily: "'Hiragino Kaku Gothic ProN', 'Noto Sans JP', sans-serif",
+        fontSize: "14px", color: "#ccddee",
+        resolution: this.textRes,
+      }).setOrigin(0.5);
+
+      const desc = this.add.text(x, btnY + 14, m.desc, {
+        fontFamily: "'Hiragino Kaku Gothic ProN', 'Noto Sans JP', sans-serif",
+        fontSize: "10px", color: "#889999",
+        resolution: this.textRes,
+      }).setOrigin(0.5);
+
+      btnBgs.push(bg);
+      btnTexts.push(label, desc);
+
+      bg.on("pointerdown", () => {
+        this.selectedMode = m.key;
+        this.updateModeButtons(btnBgs, modes);
+      });
+    }
+
+    this.updateModeButtons(btnBgs, modes);
+
+    // PC操作説明
+    this.add
+      .text(GAME_WIDTH / 2, 448, "PC: ←→/AD移動  Space発射  Esc一時停止", {
+        fontFamily: "monospace",
+        fontSize: "10px",
+        color: "#666677",
         resolution: this.textRes,
       })
       .setOrigin(0.5);
 
     // スタートボタン
+    const startBg = this.add.rectangle(
+      GAME_WIDTH / 2, GAME_HEIGHT - 130, 200, 50, 0x334488, 1
+    ).setStrokeStyle(2, 0x5566aa).setInteractive({ useHandCursor: true });
+
     const startText = this.add
-      .text(GAME_WIDTH / 2, GAME_HEIGHT - 100, "TAP TO START", {
+      .text(GAME_WIDTH / 2, GAME_HEIGHT - 130, "START", {
         fontFamily: "monospace",
-        fontSize: "22px",
+        fontSize: "24px",
         color: "#88aaff",
+        resolution: this.textRes,
       })
       .setOrigin(0.5);
 
     this.tweens.add({
       targets: startText,
-      alpha: 0.3,
+      alpha: 0.4,
       duration: 700,
       yoyo: true,
       repeat: -1,
+    });
+
+    startBg.on("pointerdown", () => {
+      if (!this.ready) return;
+      this.startGame();
     });
 
     // ビルド情報
@@ -100,18 +172,28 @@ export class TitleScene extends Phaser.Scene {
       })
       .setOrigin(0.5);
 
-    // 画面全体をタップ可能なゾーンにする
-    const zone = this.add.zone(GAME_WIDTH / 2, GAME_HEIGHT / 2, GAME_WIDTH, GAME_HEIGHT);
-    zone.setInteractive();
-    zone.on("pointerdown", () => {
-      if (!this.ready) return;
-      resumeAudio();
-      this.scene.start("GameScene");
-    });
-
     // 誤爆防止: 800ms 後に有効化
     this.time.delayedCall(800, () => {
       this.ready = true;
     });
+  }
+
+  private updateModeButtons(
+    bgs: Phaser.GameObjects.Rectangle[],
+    modes: { key: ControlMode }[],
+  ): void {
+    for (let i = 0; i < bgs.length; i++) {
+      const selected = modes[i].key === this.selectedMode;
+      bgs[i].setFillStyle(selected ? 0x445588 : 0x223344);
+      bgs[i].setStrokeStyle(2, selected ? 0x88aadd : 0x445566);
+    }
+  }
+
+  private startGame(): void {
+    try {
+      localStorage.setItem("iron-forge-control-mode", this.selectedMode);
+    } catch { /* ignore */ }
+    resumeAudio();
+    this.scene.start("GameScene", { controlMode: this.selectedMode });
   }
 }
