@@ -62,6 +62,13 @@ export class GameScene extends Phaser.Scene {
   private isSwiping = false;
   private swipeThreshold = 10;
 
+  // キーボード入力用
+  private cursors!: Phaser.Types.Input.Keyboard.CursorKeys;
+  private keyA!: Phaser.Input.Keyboard.Key;
+  private keyD!: Phaser.Input.Keyboard.Key;
+  private keySpace!: Phaser.Input.Keyboard.Key;
+  private keyEsc!: Phaser.Input.Keyboard.Key;
+
   constructor() {
     super({ key: "GameScene" });
   }
@@ -236,6 +243,7 @@ export class GameScene extends Phaser.Scene {
   }
 
   private setupInput(): void {
+    // タッチ／マウス入力
     this.input.on("pointerdown", (pointer: Phaser.Input.Pointer) => {
       if (this.gameOver || this.paused) return;
       this.touchStartX = pointer.x;
@@ -259,6 +267,48 @@ export class GameScene extends Phaser.Scene {
       if (this.gameOver || this.paused) return;
       if (!this.isSwiping) this.shoot();
     });
+
+    // キーボード入力
+    if (this.input.keyboard) {
+      this.cursors = this.input.keyboard.createCursorKeys();
+      this.keyA = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.A);
+      this.keyD = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.D);
+      this.keySpace = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.SPACE);
+      this.keyEsc = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.ESC);
+
+      this.keySpace.on("down", () => {
+        if (this.gameOver || this.paused) return;
+        this.shoot();
+      });
+
+      this.keyEsc.on("down", () => {
+        if (this.gameOver) return;
+        this.togglePause();
+      });
+    }
+  }
+
+  private updateKeyboardInput(): void {
+    if (!this.input.keyboard || this.gameOver || this.paused) return;
+
+    const moveSpeed = CELL_SIZE * 0.4; // 1フレームあたりの移動量
+    let moved = false;
+
+    if (this.cursors.left.isDown || this.keyA.isDown) {
+      this.cannon.x -= moveSpeed;
+      moved = true;
+    }
+    if (this.cursors.right.isDown || this.keyD.isDown) {
+      this.cannon.x += moveSpeed;
+      moved = true;
+    }
+
+    if (moved) {
+      this.cannon.x = Phaser.Math.Clamp(
+        this.cannon.x,
+        CELL_SIZE / 2, GRID_COLS * CELL_SIZE - CELL_SIZE / 2
+      );
+    }
   }
 
   private shoot(): void {
@@ -448,6 +498,7 @@ export class GameScene extends Phaser.Scene {
 
   update(_time: number, delta: number): void {
     if (this.gameOver || this.paused) return;
+    this.updateKeyboardInput();
     this.updateFlyingBlocks(delta);
     this.drawAimLine();
     this.checkGameOver();

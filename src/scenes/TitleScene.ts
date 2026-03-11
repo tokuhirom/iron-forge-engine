@@ -61,7 +61,7 @@ export class TitleScene extends Phaser.Scene {
       .setOrigin(0.5);
 
     // 操作説明
-    const controls = "スワイプ → 砲台移動\nタップ → 発射";
+    const controls = "スワイプ/←→ → 砲台移動\nタップ/Space → 発射";
 
     this.add
       .text(GAME_WIDTH / 2, 400, controls, {
