@@ -14,7 +14,6 @@ import {
   GRAVITY_INTERVAL,
   MIN_RECT_AREA,
   BASE_SCORE,
-  CHAIN_MULTIPLIER,
   SCRAP_SHAPES,
   COLORS,
 } from "../constants";
@@ -44,7 +43,6 @@ export class GameScene extends Phaser.Scene {
   private nextGroupId = 1;
 
   private score = 0;
-  private chain = 0;
   private scoreText!: Phaser.GameObjects.Text;
   private spawnTimer!: Phaser.Time.TimerEvent;
   private gravityTimer!: Phaser.Time.TimerEvent;
@@ -70,7 +68,6 @@ export class GameScene extends Phaser.Scene {
 
   create(): void {
     this.score = 0;
-    this.chain = 0;
     this.gameOver = false;
     this.flyingBlocks = [];
     this.groups.clear();
@@ -628,16 +625,21 @@ export class GameScene extends Phaser.Scene {
   }
 
   private addScore(area: number): void {
-    const multiplier = this.chain > 0 ? Math.pow(CHAIN_MULTIPLIER, this.chain) : 1;
-    const points = Math.floor(area * area * BASE_SCORE * multiplier);
+    // 段階ボーナス: 大きな矩形ほど倍率が跳ね上がる
+    let sizeBonus = 1;
+    if (area >= 24) sizeBonus = 8;
+    else if (area >= 15) sizeBonus = 4;
+    else if (area >= 8) sizeBonus = 2;
+
+    const points = area * BASE_SCORE * sizeBonus;
     this.score += points;
     this.scoreText.setText(`SCORE: ${this.score}`);
 
     const label = this.add
       .text(GAME_WIDTH / 2, GRID_ROWS * CELL_SIZE - 20, `+${points}`, {
         fontFamily: "monospace",
-        fontSize: area >= 12 ? "28px" : area >= 9 ? "24px" : "16px",
-        color: area >= 12 ? "#ff8800" : area >= 9 ? "#ffdd00" : "#aaddff",
+        fontSize: area >= 15 ? "28px" : area >= 8 ? "24px" : "16px",
+        color: area >= 15 ? "#ff8800" : area >= 8 ? "#ffdd00" : "#aaddff",
         stroke: "#000000", strokeThickness: 2,
       })
       .setOrigin(0.5).setDepth(15);
