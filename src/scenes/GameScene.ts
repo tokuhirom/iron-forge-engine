@@ -75,6 +75,9 @@ export class GameScene extends Phaser.Scene {
     this.groups.clear();
     this.nextGroupId = 1;
 
+    // BGMを最初に開始（遅延なし）
+    startBGM();
+
     this.gridState = Array.from({ length: GRID_ROWS }, () =>
       Array(GRID_COLS).fill(0)
     );
@@ -115,8 +118,6 @@ export class GameScene extends Phaser.Scene {
       delay: 40000, callback: this.increaseDifficulty,
       callbackScope: this, loop: true,
     });
-
-    startBGM();
 
     this.spawnGroup();
     this.setupInput();
@@ -994,15 +995,25 @@ export class GameScene extends Phaser.Scene {
     });
     elements.push(restartText);
 
-    // タップで即リスタート（タイトルに戻らない）
+    // パネル内タップでのみリスタート（外側は無視）
+    const panelW = GAME_WIDTH - 40;
+    const panelLeft = GAME_WIDTH / 2 - panelW / 2;
+    const panelRight = GAME_WIDTH / 2 + panelW / 2;
+    const panelTop = panelY - panelH / 2;
+    const panelBottom = panelY + panelH / 2;
+
     this.time.delayedCall(1000, () => {
-      this.input.once("pointerup", () => {
-        // 全UI要素を破棄
-        for (const el of elements) {
-          if (el && "destroy" in el) el.destroy();
+      const handler = (pointer: Phaser.Input.Pointer) => {
+        if (pointer.x >= panelLeft && pointer.x <= panelRight &&
+            pointer.y >= panelTop && pointer.y <= panelBottom) {
+          this.input.off("pointerup", handler);
+          for (const el of elements) {
+            if (el && "destroy" in el) el.destroy();
+          }
+          this.scene.restart();
         }
-        this.scene.restart();
-      });
+      };
+      this.input.on("pointerup", handler);
     });
   }
 }

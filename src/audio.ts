@@ -116,11 +116,13 @@ export function playSpeedUp(): void {
 
 let bgmInterval: ReturnType<typeof setInterval> | null = null;
 let bgmBpm = 120;
+let bgmPlaying = false;
 
 /** BGM開始: スチームパンク風の機械リズムループ */
 export function startBGM(): void {
   stopBGM();
   bgmBpm = 120;
+  bgmPlaying = true;
   scheduleBGMLoop();
 }
 
@@ -136,6 +138,7 @@ export function speedUpBGM(): void {
 
 /** BGM停止 */
 export function stopBGM(): void {
+  bgmPlaying = false;
   if (bgmInterval !== null) {
     clearInterval(bgmInterval);
     bgmInterval = null;
@@ -143,12 +146,30 @@ export function stopBGM(): void {
 }
 
 function scheduleBGMLoop(): void {
-  const beatMs = () => (60 / bgmBpm) * 1000;
+  if (!bgmPlaying) return;
+  const beatMs = (60 / bgmBpm) * 1000;
   playBGMBar();
   bgmInterval = setInterval(() => {
+    if (!bgmPlaying) return;
     playBGMBar();
-  }, beatMs() * 4); // 4拍ごとに1小節
+  }, beatMs * 4); // 4拍ごとに1小節
 }
+
+// タブが非表示になったらBGMを一時停止、表示されたら再開
+document.addEventListener("visibilitychange", () => {
+  if (document.hidden) {
+    // タブ非表示 → interval停止（音は自然に止まる）
+    if (bgmInterval !== null) {
+      clearInterval(bgmInterval);
+      bgmInterval = null;
+    }
+  } else {
+    // タブ表示 → 再開（bgmPlayingがtrueの場合のみ）
+    if (bgmPlaying && bgmInterval === null) {
+      scheduleBGMLoop();
+    }
+  }
+});
 
 function playBGMBar(): void {
   const ctx = getAudioCtx();
