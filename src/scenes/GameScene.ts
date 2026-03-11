@@ -585,42 +585,49 @@ export class GameScene extends Phaser.Scene {
 
     for (let i = 0; i < this.flyingBlocks.length; i++) {
       const fb = this.flyingBlocks[i];
-      fb.sprite.y -= BULLET_SPEED * dt;
+      const prevY = fb.sprite.y;
+      const newY = prevY - BULLET_SPEED * dt;
+      fb.sprite.y = newY;
 
-      if (fb.sprite.y < 0) {
+      if (newY < 0) {
         fb.sprite.destroy();
         toRemove.push(i);
         continue;
       }
 
-      const row = Math.floor(fb.sprite.y / CELL_SIZE);
-      if (row < 0 || row >= GRID_ROWS) continue;
       const col = fb.col;
+      // 移動前後の行を求め、通過した全行をスキャン（上方向に移動するので newRow <= prevRow）
+      const prevRow = Math.min(Math.floor(prevY / CELL_SIZE), GRID_ROWS - 1);
+      const newRow = Math.max(Math.floor(newY / CELL_SIZE), 0);
 
-      // 既存ブロックに衝突 → 1つ下に着弾
-      // （穴はバウンディングボックス内の空セルだが、飛行中は無視する。
-      //   非対称拡張時に意図しない位置に着弾するバグを防ぐため）
-      if (this.gridState[row][col] !== 0) {
-        const landRow = row + 1;
-        if (landRow < GRID_ROWS && this.gridState[landRow][col] === 0) {
-          // 着弾先がどこかのグループの穴か？
-          const landHoleGroup = this.getHoleGroupId(landRow, col);
-          if (landHoleGroup !== null) {
-            this.landBlockOnGrid(landRow, col, landHoleGroup);
-          } else {
-            // 隣接グループに合流、またはフリーブロック
-            const adjGroup = this.getAdjacentGroupId(landRow, col);
-            if (adjGroup !== null) {
-              this.landBlockOnGrid(landRow, col, adjGroup);
+      let hit = false;
+      // 上に向かってスキャン（下の行から上の行へ）
+      for (let row = prevRow; row >= newRow; row--) {
+        if (row < 0 || row >= GRID_ROWS) continue;
+
+        if (this.gridState[row][col] !== 0) {
+          // 既存ブロックに衝突 → 1つ下に着弾
+          const landRow = row + 1;
+          if (landRow < GRID_ROWS && this.gridState[landRow][col] === 0) {
+            const landHoleGroup = this.getHoleGroupId(landRow, col);
+            if (landHoleGroup !== null) {
+              this.landBlockOnGrid(landRow, col, landHoleGroup);
             } else {
-              this.landFreeBlock(landRow, col);
+              const adjGroup = this.getAdjacentGroupId(landRow, col);
+              if (adjGroup !== null) {
+                this.landBlockOnGrid(landRow, col, adjGroup);
+              } else {
+                this.landFreeBlock(landRow, col);
+              }
             }
           }
+          fb.sprite.destroy();
+          toRemove.push(i);
+          hit = true;
+          break;
         }
-        fb.sprite.destroy();
-        toRemove.push(i);
-        continue;
       }
+      if (hit) continue;
     }
 
     for (let i = toRemove.length - 1; i >= 0; i--) {
