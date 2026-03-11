@@ -1,5 +1,5 @@
 import Phaser from "phaser";
-import { playShoot, playLand, playShip, playGameOver } from "../audio";
+import { playShoot, playLand, playShip, playGameOver, playSpeedUp, startBGM, speedUpBGM, stopBGM } from "../audio";
 import {
   GAME_WIDTH,
   GAME_HEIGHT,
@@ -49,7 +49,7 @@ export class GameScene extends Phaser.Scene {
   private gravityTimer!: Phaser.Time.TimerEvent;
   private difficultyTimer!: Phaser.Time.TimerEvent;
   private gameOver = false;
-  private elapsedSec = 0;
+  private speedLevel = 0;
   private currentSpawnInterval = SCRAP_SPAWN_INTERVAL;
   private currentGravityInterval = GRAVITY_INTERVAL;
 
@@ -106,13 +106,15 @@ export class GameScene extends Phaser.Scene {
       callbackScope: this, loop: true,
     });
 
-    this.elapsedSec = 0;
+    this.speedLevel = 0;
     this.currentSpawnInterval = SCRAP_SPAWN_INTERVAL;
     this.currentGravityInterval = GRAVITY_INTERVAL;
     this.difficultyTimer = this.time.addEvent({
-      delay: 10000, callback: this.increaseDifficulty,
+      delay: 40000, callback: this.increaseDifficulty,
       callbackScope: this, loop: true,
     });
+
+    startBGM();
 
     this.spawnGroup();
     this.setupInput();
@@ -190,9 +192,8 @@ export class GameScene extends Phaser.Scene {
   private spawnGroup(): void {
     if (this.gameOver) return;
 
-    // 経過時間に応じて複合スポーンの確率が上がる（30秒後から）
-    const elapsed = this.time.now / 1000;
-    const compoundChance = Math.min(0.4, Math.max(0, (elapsed - 30) * 0.005));
+    // スピードレベルに応じて複合スポーンの確率が上がる
+    const compoundChance = Math.min(0.5, this.speedLevel * 0.12);
     if (Math.random() < compoundChance) {
       this.spawnCompoundGroup();
       return;
@@ -740,18 +741,52 @@ export class GameScene extends Phaser.Scene {
 
   private increaseDifficulty(): void {
     if (this.gameOver) return;
-    this.elapsedSec += 10;
+    this.speedLevel++;
 
-    this.currentSpawnInterval = Math.max(1500, this.currentSpawnInterval * 0.95);
+    // 速度を段階的にガツッと上げる
+    this.currentSpawnInterval = Math.max(1500, this.currentSpawnInterval * 0.8);
     this.spawnTimer.reset({
       delay: this.currentSpawnInterval, callback: this.spawnGroup,
       callbackScope: this, loop: true,
     });
 
-    this.currentGravityInterval = Math.max(200, this.currentGravityInterval * 0.95);
+    this.currentGravityInterval = Math.max(200, this.currentGravityInterval * 0.8);
     this.gravityTimer.reset({
       delay: this.currentGravityInterval, callback: this.applyGravity,
       callbackScope: this, loop: true,
+    });
+
+    // BGMテンポアップ
+    speedUpBGM();
+
+    // 警告音
+    playSpeedUp();
+
+    // 演出: 画面フラッシュ + テキスト
+    const flash = this.add.rectangle(
+      GAME_WIDTH / 2, GAME_HEIGHT / 2, GAME_WIDTH, GAME_HEIGHT, 0xff4400, 0.15
+    ).setDepth(30);
+    this.tweens.add({
+      targets: flash, alpha: 0, duration: 600,
+      onComplete: () => flash.destroy(),
+    });
+
+    const label = this.add.text(
+      GAME_WIDTH / 2, GAME_HEIGHT / 2,
+      `SPEED UP! Lv.${this.speedLevel}`, {
+        fontFamily: "monospace", fontSize: "26px", color: "#ff6622",
+        stroke: "#000000", strokeThickness: 4,
+      }
+    ).setOrigin(0.5).setDepth(31).setAlpha(0).setScale(1.5);
+
+    this.tweens.add({
+      targets: label, alpha: 1, scaleX: 1, scaleY: 1,
+      duration: 200, ease: "Back.easeOut",
+    });
+    this.tweens.add({
+      targets: label, alpha: 0, y: label.y - 40,
+      duration: 500, delay: 800,
+      onComplete: () => label.destroy(),
     });
   }
 
@@ -765,6 +800,7 @@ export class GameScene extends Phaser.Scene {
         this.spawnTimer.remove();
         this.gravityTimer.remove();
         this.difficultyTimer.remove();
+        stopBGM();
         this.startGameOverSequence();
         return;
       }
