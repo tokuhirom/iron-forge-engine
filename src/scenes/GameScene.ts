@@ -373,8 +373,8 @@ export class GameScene extends Phaser.Scene {
         if (this.gameOver || this.paused) return;
         this.shoot();
       });
-    this.add.text(GAME_WIDTH - 50, padY, "FIRE", {
-      fontFamily: "monospace", fontSize: "18px", color: "#ff8844",
+    this.add.text(GAME_WIDTH - 50, padY, "射出", {
+      fontFamily: "'Hiragino Kaku Gothic ProN', 'Noto Sans JP', sans-serif", fontSize: "18px", color: "#ff8844",
       resolution: this.textRes,
     }).setOrigin(0.5).setDepth(51);
   }
