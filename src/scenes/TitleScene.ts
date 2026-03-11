@@ -138,11 +138,11 @@ export class TitleScene extends Phaser.Scene {
 
     // スタートボタン
     const startBg = this.add.rectangle(
-      GAME_WIDTH / 2, GAME_HEIGHT - 130, 200, 50, 0x334488, 1
+      GAME_WIDTH / 2, 530, 200, 50, 0x334488, 1
     ).setStrokeStyle(2, 0x5566aa).setInteractive({ useHandCursor: true });
 
     const startText = this.add
-      .text(GAME_WIDTH / 2, GAME_HEIGHT - 130, "START", {
+      .text(GAME_WIDTH / 2, 530, "START", {
         fontFamily: "monospace",
         fontSize: "24px",
         color: "#88aaff",
@@ -165,7 +165,7 @@ export class TitleScene extends Phaser.Scene {
 
     // ビルド情報
     this.add
-      .text(GAME_WIDTH / 2, GAME_HEIGHT - 30, `${__BUILD_DATE__} (${__COMMIT_HASH__})`, {
+      .text(GAME_WIDTH / 2, 580, `${__BUILD_DATE__} (${__COMMIT_HASH__})`, {
         fontFamily: "monospace",
         fontSize: "10px",
         color: "#555566",
