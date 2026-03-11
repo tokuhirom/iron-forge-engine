@@ -66,10 +66,6 @@ export class GameScene extends Phaser.Scene {
   private isSwiping = false;
   private swipeThreshold = 10;
 
-  // 仮想パッド用
-  private vpadMovingLeft = false;
-  private vpadMovingRight = false;
-
   // キーボード入力用
   private cursors!: Phaser.Types.Input.Keyboard.CursorKeys;
   private keyA!: Phaser.Input.Keyboard.Key;
@@ -262,7 +258,7 @@ export class GameScene extends Phaser.Scene {
         break;
     }
 
-    // 共通キーボード入力
+    // 共通キーボード入力（1回押すごとに1マス移動）
     if (this.input.keyboard) {
       this.cursors = this.input.keyboard.createCursorKeys();
       this.keyA = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.A);
@@ -270,6 +266,22 @@ export class GameScene extends Phaser.Scene {
       this.keySpace = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.SPACE);
       this.keyEsc = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.ESC);
 
+      this.cursors.left.on("down", () => {
+        if (this.gameOver || this.paused) return;
+        this.moveCannon(-1);
+      });
+      this.cursors.right.on("down", () => {
+        if (this.gameOver || this.paused) return;
+        this.moveCannon(1);
+      });
+      this.keyA.on("down", () => {
+        if (this.gameOver || this.paused) return;
+        this.moveCannon(-1);
+      });
+      this.keyD.on("down", () => {
+        if (this.gameOver || this.paused) return;
+        this.moveCannon(1);
+      });
       this.keySpace.on("down", () => {
         if (this.gameOver || this.paused) return;
         this.shoot();
@@ -329,7 +341,7 @@ export class GameScene extends Phaser.Scene {
     const padAlpha = 0.5;
     const btnSize = 50;
 
-    // 左ボタン
+    // 左ボタン（タップで1マス移動）
     const leftBtn = this.add.text(20, padY, "\u25C0", {
       fontSize: "32px", color: "#aabbcc",
       resolution: this.textRes,
@@ -338,12 +350,10 @@ export class GameScene extends Phaser.Scene {
 
     leftBtn.on("pointerdown", () => {
       if (this.gameOver || this.paused) return;
-      this.vpadMovingLeft = true;
+      this.moveCannon(-1);
     });
-    leftBtn.on("pointerup", () => { this.vpadMovingLeft = false; });
-    leftBtn.on("pointerout", () => { this.vpadMovingLeft = false; });
 
-    // 右ボタン
+    // 右ボタン（タップで1マス移動）
     const rightBtn = this.add.text(20 + btnSize + 10, padY, "\u25B6", {
       fontSize: "32px", color: "#aabbcc",
       resolution: this.textRes,
@@ -352,10 +362,8 @@ export class GameScene extends Phaser.Scene {
 
     rightBtn.on("pointerdown", () => {
       if (this.gameOver || this.paused) return;
-      this.vpadMovingRight = true;
+      this.moveCannon(1);
     });
-    rightBtn.on("pointerup", () => { this.vpadMovingRight = false; });
-    rightBtn.on("pointerout", () => { this.vpadMovingRight = false; });
 
     // 発射ボタン
     const fireBtn = this.add.text(GAME_WIDTH - 20, padY, "FIRE", {
@@ -371,41 +379,13 @@ export class GameScene extends Phaser.Scene {
     });
   }
 
-  private updateMovementInput(): void {
-    if (this.gameOver || this.paused) return;
-
-    const moveSpeed = CELL_SIZE * 0.4;
-    let moved = false;
-
-    // キーボード
-    if (this.input.keyboard) {
-      if (this.cursors.left.isDown || this.keyA.isDown) {
-        this.cannon.x -= moveSpeed;
-        moved = true;
-      }
-      if (this.cursors.right.isDown || this.keyD.isDown) {
-        this.cannon.x += moveSpeed;
-        moved = true;
-      }
-    }
-
-    // 仮想パッド
-    if (this.vpadMovingLeft) {
-      this.cannon.x -= moveSpeed;
-      moved = true;
-    }
-    if (this.vpadMovingRight) {
-      this.cannon.x += moveSpeed;
-      moved = true;
-    }
-
-    if (moved) {
-      this.cannon.x = Phaser.Math.Clamp(
-        this.cannon.x,
-        CELL_SIZE / 2, GRID_COLS * CELL_SIZE - CELL_SIZE / 2
-      );
-    }
+  /** 砲台を指定方向に1マス移動 */
+  private moveCannon(dir: -1 | 1): void {
+    const col = Math.floor(this.cannon.x / CELL_SIZE);
+    const newCol = Phaser.Math.Clamp(col + dir, 0, GRID_COLS - 1);
+    this.cannon.x = newCol * CELL_SIZE + CELL_SIZE / 2;
   }
+
 
   private shoot(): void {
     const col = Math.floor(this.cannon.x / CELL_SIZE);
@@ -594,7 +574,6 @@ export class GameScene extends Phaser.Scene {
 
   update(_time: number, delta: number): void {
     if (this.gameOver || this.paused) return;
-    this.updateMovementInput();
     this.updateFlyingBlocks(delta);
     this.drawAimLine();
     this.checkGameOver();
