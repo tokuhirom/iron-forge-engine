@@ -84,12 +84,14 @@ export class TitleScene extends Phaser.Scene {
       })
       .setOrigin(0.5);
 
-    // 少し遅延させてゲームオーバー画面からのタップ誤爆を防止
-    this.time.delayedCall(500, () => {
-      this.input.once("pointerup", () => {
-        resumeAudio();
-        this.scene.start("GameScene");
-      });
+    // 遅延させてゲームオーバー画面からのタップ誤爆を防止
+    let ready = false;
+    this.time.delayedCall(800, () => { ready = true; });
+
+    this.input.on("pointerdown", () => {
+      if (!ready) return;
+      resumeAudio();
+      this.scene.start("GameScene");
     });
   }
 }
