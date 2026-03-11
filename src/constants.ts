@@ -3,12 +3,12 @@ export type ControlMode = "direct" | "swipe" | "vpad";
 
 // ゲーム画面サイズ（縦画面）
 export const GAME_WIDTH = 390;
-export const GAME_HEIGHT = 700;
+export const GAME_HEIGHT = 750;
 
 // グリッド設定
 export const GRID_COLS = 20;
 export const CELL_SIZE = Math.floor(GAME_WIDTH / GRID_COLS); // 19px
-export const CANNON_AREA_HEIGHT = 70;
+export const CANNON_AREA_HEIGHT = 120;
 export const GRID_ROWS = Math.floor((GAME_HEIGHT - CANNON_AREA_HEIGHT) / CELL_SIZE);
 
 // 砲台
