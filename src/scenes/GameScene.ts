@@ -989,7 +989,7 @@ export class GameScene extends Phaser.Scene {
 
     // パネル背景
     const panelY = GAME_HEIGHT / 2;
-    const panelH = 320;
+    const panelH = 360;
     const panel = this.add.rectangle(
       GAME_WIDTH / 2, panelY, GAME_WIDTH - 40, panelH,
       0x1a1a3e, 0.95
@@ -1069,40 +1069,73 @@ export class GameScene extends Phaser.Scene {
       elements.push(newRecord);
     }
 
-    // リスタートボタン
-    const restartText = this.add.text(
-      GAME_WIDTH / 2, panelY + panelH / 2 - 30, "TAP TO RETRY", {
-        fontFamily: "monospace", fontSize: "20px", color: "#88aaff",
+    // ボタン領域
+    const btnY = panelY + panelH / 2 - 55;
+    const btnW = 130;
+    const btnH = 40;
+
+    // シェアボタン
+    const shareBg = this.add.rectangle(
+      GAME_WIDTH / 2 - 75, btnY, btnW, btnH, 0x335588, 1
+    ).setDepth(42).setStrokeStyle(1, 0x5588bb).setAlpha(0).setInteractive({ useHandCursor: true });
+    const shareText = this.add.text(
+      GAME_WIDTH / 2 - 75, btnY, "SHARE", {
+        fontFamily: "monospace", fontSize: "16px", color: "#aaddff",
+        resolution: this.textRes,
       }
-    ).setOrigin(0.5).setDepth(42).setAlpha(0);
-    this.tweens.add({
-      targets: restartText, alpha: 1, duration: 300, delay: 900,
+    ).setOrigin(0.5).setDepth(43).setAlpha(0);
+    this.tweens.add({ targets: [shareBg, shareText], alpha: 1, duration: 300, delay: 900 });
+    elements.push(shareBg, shareText);
+
+    shareBg.on("pointerdown", () => {
+      this.shareScore();
     });
+
+    // リトライボタン
+    const retryBg = this.add.rectangle(
+      GAME_WIDTH / 2 + 75, btnY, btnW, btnH, 0x3355aa, 1
+    ).setDepth(42).setStrokeStyle(1, 0x5588dd).setAlpha(0).setInteractive({ useHandCursor: true });
+    const retryText = this.add.text(
+      GAME_WIDTH / 2 + 75, btnY, "RETRY", {
+        fontFamily: "monospace", fontSize: "16px", color: "#88aaff",
+        resolution: this.textRes,
+      }
+    ).setOrigin(0.5).setDepth(43).setAlpha(0);
+    this.tweens.add({ targets: [retryBg, retryText], alpha: 1, duration: 300, delay: 900 });
     this.tweens.add({
-      targets: restartText, alpha: 0.3, duration: 600,
+      targets: retryText, alpha: 0.4, duration: 600,
       yoyo: true, repeat: -1, delay: 1200,
     });
-    elements.push(restartText);
-
-    // パネル内タップでのみリスタート（外側は無視）
-    const panelW = GAME_WIDTH - 40;
-    const panelLeft = GAME_WIDTH / 2 - panelW / 2;
-    const panelRight = GAME_WIDTH / 2 + panelW / 2;
-    const panelTop = panelY - panelH / 2;
-    const panelBottom = panelY + panelH / 2;
+    elements.push(retryBg, retryText);
 
     this.time.delayedCall(1000, () => {
-      const handler = (pointer: Phaser.Input.Pointer) => {
-        if (pointer.x >= panelLeft && pointer.x <= panelRight &&
-            pointer.y >= panelTop && pointer.y <= panelBottom) {
-          this.input.off("pointerup", handler);
-          for (const el of elements) {
-            if (el && "destroy" in el) el.destroy();
-          }
-          this.scene.restart();
+      retryBg.on("pointerdown", () => {
+        for (const el of elements) {
+          if (el && "destroy" in el) el.destroy();
         }
-      };
-      this.input.on("pointerup", handler);
+        this.scene.restart();
+      });
     });
+  }
+
+  private shareScore(): void {
+    const text = `鉄塊機関 ―IRON FORGE ENGINE―\nSCORE: ${this.score}\n#鉄塊機関`;
+    const url = "https://tokuhirom.github.io/iron-forge-engine/";
+
+    if (navigator.share) {
+      navigator.share({ title: "鉄塊機関", text, url }).catch(() => {});
+    } else {
+      navigator.clipboard.writeText(`${text}\n${url}`).then(() => {
+        const msg = this.add.text(GAME_WIDTH / 2, GAME_HEIGHT / 2 + 100, "Copied!", {
+          fontFamily: "monospace", fontSize: "16px", color: "#88ff88",
+          stroke: "#000000", strokeThickness: 2,
+          resolution: this.textRes,
+        }).setOrigin(0.5).setDepth(50);
+        this.tweens.add({
+          targets: msg, alpha: 0, y: msg.y - 20, delay: 800, duration: 400,
+          onComplete: () => msg.destroy(),
+        });
+      }).catch(() => {});
+    }
   }
 }
