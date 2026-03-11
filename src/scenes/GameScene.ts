@@ -50,6 +50,7 @@ export class GameScene extends Phaser.Scene {
   private gravityTimer!: Phaser.Time.TimerEvent;
   private difficultyTimer!: Phaser.Time.TimerEvent;
   private gameOver = false;
+  private paused = false;
   private speedLevel = 0;
   private currentSpawnInterval = SCRAP_SPAWN_INTERVAL;
   private currentGravityInterval = GRAVITY_INTERVAL;
@@ -121,6 +122,7 @@ export class GameScene extends Phaser.Scene {
 
     this.spawnGroup();
     this.setupInput();
+    this.createPauseButton();
 
     const hint = this.add
       .text(GAME_WIDTH / 2, GAME_HEIGHT / 2 - 40,
@@ -134,6 +136,93 @@ export class GameScene extends Phaser.Scene {
       targets: hint, alpha: 0, delay: 3000, duration: 800,
       onComplete: () => hint.destroy(),
     });
+  }
+
+  private createPauseButton(): void {
+    const btn = this.add.text(GAME_WIDTH - 10, 10, "II", {
+      fontFamily: "monospace", fontSize: "22px", color: "#8899aa",
+      stroke: "#000000", strokeThickness: 2,
+      resolution: this.textRes,
+    }).setOrigin(1, 0).setDepth(50).setInteractive({ useHandCursor: true });
+
+    btn.on("pointerdown", (pointer: Phaser.Input.Pointer) => {
+      pointer.event.stopPropagation();
+      if (this.gameOver) return;
+      this.togglePause();
+    });
+  }
+
+  private togglePause(): void {
+    if (this.paused) {
+      this.resumeGame();
+    } else {
+      this.pauseGame();
+    }
+  }
+
+  private pauseOverlay: Phaser.GameObjects.Rectangle | null = null;
+  private pauseText: Phaser.GameObjects.Text | null = null;
+
+  private pauseGame(): void {
+    this.paused = true;
+    this.scene.pause();
+    stopBGM();
+
+    // ブロックを隠す（考えられないように）
+    for (let r = 0; r < GRID_ROWS; r++) {
+      for (let c = 0; c < GRID_COLS; c++) {
+        const block = this.grid[r][c];
+        if (block) block.setVisible(false);
+      }
+    }
+    this.outlineGraphics.setVisible(false);
+    this.aimLineGraphics.setVisible(false);
+    for (const fb of this.flyingBlocks) {
+      fb.sprite.setVisible(false);
+    }
+
+    // オーバーレイ
+    this.pauseOverlay = this.add.rectangle(
+      GAME_WIDTH / 2, GAME_HEIGHT / 2, GAME_WIDTH, GAME_HEIGHT, 0x000000, 0.8
+    ).setDepth(60);
+
+    this.pauseText = this.add.text(GAME_WIDTH / 2, GAME_HEIGHT / 2, "PAUSE\n\nタップで再開", {
+      fontFamily: "'Hiragino Kaku Gothic ProN', 'Noto Sans JP', sans-serif",
+      fontSize: "24px", color: "#aabbcc",
+      align: "center", lineSpacing: 8,
+      stroke: "#000000", strokeThickness: 2,
+      resolution: this.textRes,
+    }).setOrigin(0.5).setDepth(61);
+
+    // scene.pause()するとinputも止まるので、resume用にsceneイベントを使う
+    this.scene.resume();
+    // inputをポーズ解除用に限定
+    this.input.once("pointerdown", () => {
+      if (this.paused) this.resumeGame();
+    });
+  }
+
+  private resumeGame(): void {
+    this.paused = false;
+
+    // ブロックを再表示
+    for (let r = 0; r < GRID_ROWS; r++) {
+      for (let c = 0; c < GRID_COLS; c++) {
+        const block = this.grid[r][c];
+        if (block) block.setVisible(true);
+      }
+    }
+    this.outlineGraphics.setVisible(true);
+    this.aimLineGraphics.setVisible(true);
+    for (const fb of this.flyingBlocks) {
+      fb.sprite.setVisible(true);
+    }
+
+    // オーバーレイ削除
+    if (this.pauseOverlay) { this.pauseOverlay.destroy(); this.pauseOverlay = null; }
+    if (this.pauseText) { this.pauseText.destroy(); this.pauseText = null; }
+
+    startBGM();
   }
 
   private drawGridLines(): void {
@@ -151,13 +240,13 @@ export class GameScene extends Phaser.Scene {
 
   private setupInput(): void {
     this.input.on("pointerdown", (pointer: Phaser.Input.Pointer) => {
-      if (this.gameOver) return;
+      if (this.gameOver || this.paused) return;
       this.touchStartX = pointer.x;
       this.isSwiping = false;
     });
 
     this.input.on("pointermove", (pointer: Phaser.Input.Pointer) => {
-      if (this.gameOver || !pointer.isDown) return;
+      if (this.gameOver || this.paused || !pointer.isDown) return;
       const dx = pointer.x - this.touchStartX;
       if (Math.abs(dx) > this.swipeThreshold) {
         this.isSwiping = true;
@@ -170,7 +259,7 @@ export class GameScene extends Phaser.Scene {
     });
 
     this.input.on("pointerup", () => {
-      if (this.gameOver) return;
+      if (this.gameOver || this.paused) return;
       if (!this.isSwiping) this.shoot();
     });
   }
@@ -193,7 +282,7 @@ export class GameScene extends Phaser.Scene {
   // --- グループ生成 ---
 
   private spawnGroup(): void {
-    if (this.gameOver) return;
+    if (this.gameOver || this.paused) return;
 
     // スピードレベルに応じて複合スポーンの確率が上がる
     const compoundChance = Math.min(0.5, this.speedLevel * 0.12);
@@ -361,7 +450,7 @@ export class GameScene extends Phaser.Scene {
   // --- 弾更新 ---
 
   update(_time: number, delta: number): void {
-    if (this.gameOver) return;
+    if (this.gameOver || this.paused) return;
     this.updateFlyingBlocks(delta);
     this.drawAimLine();
     this.checkGameOver();
@@ -562,7 +651,7 @@ export class GameScene extends Phaser.Scene {
   // --- 重力（グループ単位 + フリーブロック） ---
 
   private applyGravity(): void {
-    if (this.gameOver) return;
+    if (this.gameOver || this.paused) return;
 
     // フリーブロック落下
     this.applyFreeBlockGravity();
@@ -743,7 +832,7 @@ export class GameScene extends Phaser.Scene {
   // --- 難易度上昇 ---
 
   private increaseDifficulty(): void {
-    if (this.gameOver) return;
+    if (this.gameOver || this.paused) return;
     this.speedLevel++;
 
     // 速度を段階的にガツッと上げる
