@@ -325,7 +325,7 @@ export class GameScene extends Phaser.Scene {
 
   /** 仮想パッド: 画面下部に左右ボタン+発射ボタン */
   private setupVpadInput(): void {
-    const padY = CANNON_Y + 10;
+    const padY = GAME_HEIGHT - 25;
     const padAlpha = 0.5;
     const btnSize = 50;
 
