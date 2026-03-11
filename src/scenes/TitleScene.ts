@@ -82,7 +82,7 @@ export class TitleScene extends Phaser.Scene {
 
     const modes: { key: ControlMode; label: string; desc: string }[] = [
       { key: "direct", label: "ダイレクト", desc: "タップした列に発射" },
-      { key: "swipe",  label: "スワイプ",   desc: "スワイプ移動+タップ発射" },
+      { key: "swipe",  label: "スワイプ",   desc: "スワイプ+タップ" },
       { key: "vpad",   label: "仮想パッド", desc: "← → ボタンで移動" },
     ];
 
@@ -142,8 +142,8 @@ export class TitleScene extends Phaser.Scene {
     ).setStrokeStyle(2, 0x5566aa).setInteractive({ useHandCursor: true });
 
     const startText = this.add
-      .text(GAME_WIDTH / 2, 530, "START", {
-        fontFamily: "monospace",
+      .text(GAME_WIDTH / 2, 530, "開始", {
+        fontFamily: "'Hiragino Kaku Gothic ProN', 'Noto Sans JP', sans-serif",
         fontSize: "24px",
         color: "#88aaff",
         resolution: this.textRes,

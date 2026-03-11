@@ -109,7 +109,7 @@ export class GameScene extends Phaser.Scene {
     this.cannon.setStrokeStyle(2, 0x997733);
     this.cannon.setDepth(10);
 
-    this.scoreText = this.add.text(10, 10, "SCORE: 0", {
+    this.scoreText = this.add.text(10, 10, "得点:0", {
       fontFamily: "monospace", fontSize: "18px", color: COLORS.text,
       resolution: this.textRes,
     });
@@ -787,7 +787,7 @@ export class GameScene extends Phaser.Scene {
 
     const points = area * BASE_SCORE * sizeBonus;
     this.score += points;
-    this.scoreText.setText(`SCORE: ${this.score}`);
+    this.scoreText.setText(`得点:${this.score}`);
 
     const label = this.add
       .text(GAME_WIDTH / 2, GRID_ROWS * CELL_SIZE - 20, `+${points}`, {
@@ -1166,7 +1166,7 @@ export class GameScene extends Phaser.Scene {
     // 今回のスコア
     const scoreLabel = this.add.text(
       GAME_WIDTH / 2, panelY - panelH / 2 + 65,
-      `YOUR SCORE: ${this.score}`, {
+      `得点:${this.score}`, {
         fontFamily: "monospace", fontSize: "18px", color: "#ffdd44",
         stroke: "#000000", strokeThickness: 2,
       }
@@ -1275,7 +1275,7 @@ export class GameScene extends Phaser.Scene {
   }
 
   private shareScore(): void {
-    const text = `鉄塊機関 ―IRON FORGE ENGINE―\nSCORE: ${this.score}\n#鉄塊機関`;
+    const text = `鉄塊機関 ―IRON FORGE ENGINE―\n得点:${this.score}\n#鉄塊機関`;
     const url = "https://tokuhirom.github.io/iron-forge-engine/";
 
     if (navigator.share) {
