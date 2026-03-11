@@ -411,8 +411,29 @@ export class GameScene extends Phaser.Scene {
 
   private addScore(area: number): void {
     const multiplier = this.chain > 0 ? Math.pow(CHAIN_MULTIPLIER, this.chain) : 1;
-    this.score += Math.floor(area * BASE_SCORE * multiplier);
+    // 面積の2乗に比例 → 大きい矩形ほど圧倒的に高スコア
+    // 2x2=4 → 1600, 3x3=9 → 8100, 4x4=16 → 25600
+    const points = Math.floor(area * area * BASE_SCORE * multiplier);
+    this.score += points;
     this.scoreText.setText(`SCORE: ${this.score}`);
+
+    // 獲得スコア表示
+    const label = this.add
+      .text(GAME_WIDTH / 2, GRID_ROWS * CELL_SIZE - 20, `+${points}`, {
+        fontFamily: "monospace",
+        fontSize: area >= 9 ? "24px" : "16px",
+        color: area >= 9 ? "#ffdd00" : "#aaddff",
+        stroke: "#000000",
+        strokeThickness: 2,
+      })
+      .setOrigin(0.5);
+    this.tweens.add({
+      targets: label,
+      y: label.y - 40,
+      alpha: 0,
+      duration: 800,
+      onComplete: () => label.destroy(),
+    });
   }
 
   private applyGravity(): void {
