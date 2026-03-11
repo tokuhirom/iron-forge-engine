@@ -73,6 +73,15 @@ export class TitleScene extends Phaser.Scene {
       repeat: -1,
     });
 
+    // ビルド情報
+    this.add
+      .text(GAME_WIDTH / 2, GAME_HEIGHT - 30, `${__BUILD_DATE__} (${__COMMIT_HASH__})`, {
+        fontFamily: "monospace",
+        fontSize: "10px",
+        color: "#555566",
+      })
+      .setOrigin(0.5);
+
     this.input.once("pointerup", () => {
       this.scene.start("GameScene");
     });

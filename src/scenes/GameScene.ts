@@ -45,7 +45,11 @@ export class GameScene extends Phaser.Scene {
   private scoreText!: Phaser.GameObjects.Text;
   private spawnTimer!: Phaser.Time.TimerEvent;
   private gravityTimer!: Phaser.Time.TimerEvent;
+  private difficultyTimer!: Phaser.Time.TimerEvent;
   private gameOver = false;
+  private elapsedSec = 0;
+  private currentSpawnInterval = SCRAP_SPAWN_INTERVAL;
+  private currentGravityInterval = GRAVITY_INTERVAL;
 
   // 描画用
   private outlineGraphics!: Phaser.GameObjects.Graphics;
@@ -111,6 +115,17 @@ export class GameScene extends Phaser.Scene {
     this.gravityTimer = this.time.addEvent({
       delay: GRAVITY_INTERVAL,
       callback: this.applyGravity,
+      callbackScope: this,
+      loop: true,
+    });
+
+    // 難易度上昇タイマー（10秒ごとに少しずつ速くなる）
+    this.elapsedSec = 0;
+    this.currentSpawnInterval = SCRAP_SPAWN_INTERVAL;
+    this.currentGravityInterval = GRAVITY_INTERVAL;
+    this.difficultyTimer = this.time.addEvent({
+      delay: 10000,
+      callback: this.increaseDifficulty,
       callbackScope: this,
       loop: true,
     });
@@ -582,6 +597,31 @@ export class GameScene extends Phaser.Scene {
     }
   }
 
+  // --- 難易度上昇 ---
+
+  private increaseDifficulty(): void {
+    if (this.gameOver) return;
+    this.elapsedSec += 10;
+
+    // 生成間隔: 4000ms → 最速1500ms（10秒ごとに5%短縮）
+    this.currentSpawnInterval = Math.max(1500, this.currentSpawnInterval * 0.95);
+    this.spawnTimer.reset({
+      delay: this.currentSpawnInterval,
+      callback: this.spawnGroup,
+      callbackScope: this,
+      loop: true,
+    });
+
+    // 重力間隔: 600ms → 最速200ms（10秒ごとに5%短縮）
+    this.currentGravityInterval = Math.max(200, this.currentGravityInterval * 0.95);
+    this.gravityTimer.reset({
+      delay: this.currentGravityInterval,
+      callback: this.applyGravity,
+      callbackScope: this,
+      loop: true,
+    });
+  }
+
   // --- ゲームオーバー ---
 
   private checkGameOver(): void {
@@ -591,6 +631,7 @@ export class GameScene extends Phaser.Scene {
         this.gameOver = true;
         this.spawnTimer.remove();
         this.gravityTimer.remove();
+        this.difficultyTimer.remove();
         this.showGameOver();
         return;
       }
