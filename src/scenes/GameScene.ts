@@ -765,36 +765,206 @@ export class GameScene extends Phaser.Scene {
         this.spawnTimer.remove();
         this.gravityTimer.remove();
         this.difficultyTimer.remove();
-        this.showGameOver();
+        this.startGameOverSequence();
         return;
       }
     }
   }
 
-  private showGameOver(): void {
-    playGameOver();
+  /** ゲームオーバー演出シーケンス */
+  private startGameOverSequence(): void {
     this.aimLineGraphics.clear();
 
-    this.add.rectangle(
-      GAME_WIDTH / 2, GAME_HEIGHT / 2, GAME_WIDTH, GAME_HEIGHT, 0x000000, 0.7
-    ).setDepth(20);
-
-    this.add.text(GAME_WIDTH / 2, GAME_HEIGHT / 2 - 60, "GAME OVER", {
-      fontFamily: "monospace", fontSize: "36px", color: "#ff4444",
-    }).setOrigin(0.5).setDepth(21);
-
-    this.add.text(GAME_WIDTH / 2, GAME_HEIGHT / 2, `SCORE: ${this.score}`, {
-      fontFamily: "monospace", fontSize: "24px", color: COLORS.text,
-    }).setOrigin(0.5).setDepth(21);
-
-    const restartText = this.add.text(GAME_WIDTH / 2, GAME_HEIGHT / 2 + 60, "TAP TO RESTART", {
-      fontFamily: "monospace", fontSize: "20px", color: "#88aaff",
-    }).setOrigin(0.5).setDepth(21);
-
+    // ── 1. ヒットストップ: 画面フリーズ + 白フラッシュ ──
+    const flash = this.add.rectangle(
+      GAME_WIDTH / 2, GAME_HEIGHT / 2, GAME_WIDTH, GAME_HEIGHT, 0xffffff, 0.6
+    ).setDepth(30);
     this.tweens.add({
-      targets: restartText, alpha: 0.3, duration: 600, yoyo: true, repeat: -1,
+      targets: flash, alpha: 0, duration: 300,
+      onComplete: () => flash.destroy(),
     });
 
-    this.input.once("pointerup", () => { this.scene.start("TitleScene"); });
+    // ── 2. 自機やられエフェクト ──
+    // 砲台を赤く点滅させて震わせる
+    const cannonX = this.cannon.x;
+    this.tweens.add({
+      targets: this.cannon,
+      x: { value: cannonX + 4, duration: 40, yoyo: true, repeat: 8 },
+    });
+    this.cannon.setFillStyle(0xff3333);
+    this.cannon.setStrokeStyle(2, 0xff0000);
+
+    // 砲台から破片パーティクル
+    for (let i = 0; i < 12; i++) {
+      const px = this.cannon.x + Phaser.Math.Between(-15, 15);
+      const py = CANNON_Y + Phaser.Math.Between(-10, 10);
+      const particle = this.add.rectangle(
+        px, py,
+        Phaser.Math.Between(3, 7), Phaser.Math.Between(3, 7),
+        Phaser.Math.RND.pick([0xff4444, 0xff8833, 0xffcc00])
+      ).setDepth(25);
+
+      this.tweens.add({
+        targets: particle,
+        x: px + Phaser.Math.Between(-40, 40),
+        y: py + Phaser.Math.Between(-60, 20),
+        alpha: 0,
+        angle: Phaser.Math.Between(-180, 180),
+        duration: Phaser.Math.Between(400, 800),
+        ease: "Power2",
+        onComplete: () => particle.destroy(),
+      });
+    }
+
+    // ── 3. ドゥーンドゥーンドゥーン音（0.45秒×3 = 約1.35秒）──
+    playGameOver();
+
+    // ── 4. 音が終わった後にハイスコア画面表示 ──
+    this.time.delayedCall(1800, () => {
+      this.showHighScoreScreen();
+    });
+  }
+
+  // --- ハイスコア管理 ---
+
+  private static readonly STORAGE_KEY = "iron-forge-high-scores";
+
+  private loadHighScores(): number[] {
+    try {
+      const data = localStorage.getItem(GameScene.STORAGE_KEY);
+      if (data) return JSON.parse(data) as number[];
+    } catch { /* ignore */ }
+    return [];
+  }
+
+  private saveHighScore(score: number): { scores: number[]; rank: number } {
+    const scores = this.loadHighScores();
+    scores.push(score);
+    scores.sort((a, b) => b - a);
+    const rank = scores.indexOf(score);
+    const top5 = scores.slice(0, 5);
+    try {
+      localStorage.setItem(GameScene.STORAGE_KEY, JSON.stringify(top5));
+    } catch { /* ignore */ }
+    return { scores: top5, rank };
+  }
+
+  /** ハイスコア画面表示 */
+  private showHighScoreScreen(): void {
+    const { scores, rank } = this.saveHighScore(this.score);
+
+    // 暗転
+    const overlay = this.add.rectangle(
+      GAME_WIDTH / 2, GAME_HEIGHT / 2, GAME_WIDTH, GAME_HEIGHT, 0x000000, 0
+    ).setDepth(40);
+    this.tweens.add({ targets: overlay, alpha: 0.75, duration: 400 });
+
+    // パネル背景
+    const panelY = GAME_HEIGHT / 2;
+    const panelH = 320;
+    const panel = this.add.rectangle(
+      GAME_WIDTH / 2, panelY, GAME_WIDTH - 40, panelH,
+      0x1a1a3e, 0.95
+    ).setDepth(41).setStrokeStyle(2, 0x4466aa);
+    panel.setAlpha(0);
+    this.tweens.add({ targets: panel, alpha: 1, duration: 400, delay: 100 });
+
+    const elements: Phaser.GameObjects.GameObject[] = [overlay, panel];
+
+    // GAME OVER タイトル
+    const title = this.add.text(GAME_WIDTH / 2, panelY - panelH / 2 + 30, "GAME OVER", {
+      fontFamily: "monospace", fontSize: "28px", color: "#ff4444",
+      stroke: "#000000", strokeThickness: 3,
+    }).setOrigin(0.5).setDepth(42).setAlpha(0);
+    this.tweens.add({ targets: title, alpha: 1, duration: 300, delay: 200 });
+    elements.push(title);
+
+    // 今回のスコア
+    const scoreLabel = this.add.text(
+      GAME_WIDTH / 2, panelY - panelH / 2 + 65,
+      `YOUR SCORE: ${this.score}`, {
+        fontFamily: "monospace", fontSize: "18px", color: "#ffdd44",
+        stroke: "#000000", strokeThickness: 2,
+      }
+    ).setOrigin(0.5).setDepth(42).setAlpha(0);
+    this.tweens.add({ targets: scoreLabel, alpha: 1, duration: 300, delay: 300 });
+    elements.push(scoreLabel);
+
+    // ハイスコアリスト
+    const listStartY = panelY - panelH / 2 + 105;
+    const rankLabels = ["1st", "2nd", "3rd", "4th", "5th"];
+
+    for (let i = 0; i < 5; i++) {
+      const y = listStartY + i * 30;
+      const isCurrentScore = i === rank;
+      const scoreVal = scores[i];
+      const displayText = scoreVal !== undefined
+        ? `${rankLabels[i]}  ${String(scoreVal).padStart(8, " ")}`
+        : `${rankLabels[i]}  --------`;
+
+      const color = isCurrentScore ? "#ffcc00" : "#aabbcc";
+      const fontSize = isCurrentScore ? "18px" : "16px";
+
+      const entry = this.add.text(GAME_WIDTH / 2, y, displayText, {
+        fontFamily: "monospace", fontSize, color,
+        stroke: "#000000", strokeThickness: isCurrentScore ? 3 : 1,
+      }).setOrigin(0.5).setDepth(42).setAlpha(0);
+
+      this.tweens.add({
+        targets: entry, alpha: 1, duration: 250, delay: 400 + i * 80,
+      });
+
+      // 今回のスコアは点滅させてハイライト
+      if (isCurrentScore) {
+        this.tweens.add({
+          targets: entry, alpha: 0.4, duration: 500,
+          yoyo: true, repeat: -1, delay: 900,
+        });
+      }
+      elements.push(entry);
+    }
+
+    // NEW RECORD 表示
+    if (rank === 0 && scores.length > 1) {
+      const newRecord = this.add.text(
+        GAME_WIDTH / 2, panelY - panelH / 2 + 85, "NEW RECORD!", {
+          fontFamily: "monospace", fontSize: "14px", color: "#ff8800",
+        }
+      ).setOrigin(0.5).setDepth(42).setAlpha(0);
+      this.tweens.add({
+        targets: newRecord, alpha: 1, duration: 300, delay: 500,
+      });
+      this.tweens.add({
+        targets: newRecord, scaleX: 1.1, scaleY: 1.1,
+        duration: 400, yoyo: true, repeat: -1, delay: 800,
+      });
+      elements.push(newRecord);
+    }
+
+    // リスタートボタン
+    const restartText = this.add.text(
+      GAME_WIDTH / 2, panelY + panelH / 2 - 30, "TAP TO RETRY", {
+        fontFamily: "monospace", fontSize: "20px", color: "#88aaff",
+      }
+    ).setOrigin(0.5).setDepth(42).setAlpha(0);
+    this.tweens.add({
+      targets: restartText, alpha: 1, duration: 300, delay: 900,
+    });
+    this.tweens.add({
+      targets: restartText, alpha: 0.3, duration: 600,
+      yoyo: true, repeat: -1, delay: 1200,
+    });
+    elements.push(restartText);
+
+    // タップで即リスタート（タイトルに戻らない）
+    this.time.delayedCall(1000, () => {
+      this.input.once("pointerup", () => {
+        // 全UI要素を破棄
+        for (const el of elements) {
+          if (el && "destroy" in el) el.destroy();
+        }
+        this.scene.restart();
+      });
+    });
   }
 }
