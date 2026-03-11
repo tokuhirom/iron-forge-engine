@@ -136,8 +136,8 @@ export class GameScene extends Phaser.Scene {
   }
 
   private createPauseButton(): void {
-    const btn = this.add.text(GAME_WIDTH - 10, 10, "II", {
-      fontFamily: "monospace", fontSize: "22px", color: "#8899aa",
+    const btn = this.add.text(GAME_WIDTH - 10, 10, "\u23F8", {
+      fontSize: "24px", color: "#8899aa",
       stroke: "#000000", strokeThickness: 2,
       resolution: this.textRes,
     }).setOrigin(1, 0).setDepth(50).setInteractive({ useHandCursor: true });
