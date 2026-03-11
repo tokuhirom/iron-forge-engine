@@ -2,7 +2,7 @@ import { defineConfig } from "vite";
 import { execSync } from "child_process";
 
 const commitHash = execSync("git rev-parse --short HEAD").toString().trim();
-const buildDate = new Date().toISOString().replace("T", " ").slice(0, 19);
+const buildDate = new Date().toLocaleString("ja-JP", { timeZone: "Asia/Tokyo", hour12: false });
 
 export default defineConfig({
   base: "./",
