@@ -1,5 +1,5 @@
 import Phaser from "phaser";
-import { resumeAudio, playShoot, playLand, playShip, playGameOver } from "../audio";
+import { playShoot, playLand, playShip, playGameOver } from "../audio";
 import {
   GAME_WIDTH,
   GAME_HEIGHT,
@@ -697,25 +697,7 @@ export class GameScene extends Phaser.Scene {
         }
       }
 
-      // 面積表示（大きいグループ）
-      if (area >= 6) {
-        const holeCount = this.countHoles(group);
-        const label = `${area}マス あと${holeCount}`;
-        this.outlineGraphics.fillStyle(0x000000, 0.5);
-        // テキストはGraphicsでは描けないので、outlineGraphicsの上にtextは別管理が必要
-        // → redraw時に毎回作ると重いので、面積表示は枠色で代替
-      }
     }
-  }
-
-  private countHoles(group: ScrapGroup): number {
-    let count = 0;
-    for (let r = group.r; r < group.r + group.h; r++) {
-      for (let c = group.c; c < group.c + group.w; c++) {
-        if (this.gridState[r][c] !== group.id) count++;
-      }
-    }
-    return count;
   }
 
   /** 射線 + 着弾予測 */
