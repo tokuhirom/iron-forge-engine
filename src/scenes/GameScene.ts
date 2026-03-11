@@ -251,9 +251,8 @@ export class GameScene extends Phaser.Scene {
       // この弾ブロックが着地する行を判定
       const row = Math.floor(fb.sprite.y / CELL_SIZE);
 
-      // 画面外に出た → 最上行に配置
+      // 画面外に出た → そのまま消える
       if (fb.sprite.y < 0) {
-        this.landBlock(0, fb.col);
         fb.sprite.destroy();
         toRemove.push(i);
         continue;
