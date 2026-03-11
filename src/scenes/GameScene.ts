@@ -33,6 +33,7 @@ interface FlyingBlock {
 }
 
 export class GameScene extends Phaser.Scene {
+  private readonly textRes = Math.max(2, window.devicePixelRatio || 2);
   private cannon!: Phaser.GameObjects.Rectangle;
   private flyingBlocks: FlyingBlock[] = [];
 
@@ -94,6 +95,7 @@ export class GameScene extends Phaser.Scene {
 
     this.scoreText = this.add.text(10, 10, "SCORE: 0", {
       fontFamily: "monospace", fontSize: "18px", color: COLORS.text,
+      resolution: this.textRes,
     });
     this.scoreText.setDepth(10);
 
