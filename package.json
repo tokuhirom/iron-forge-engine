@@ -1,0 +1,29 @@
+{
+  "name": "iron-forge-engine",
+  "version": "1.0.0",
+  "description": "スチームパンクの世界を舞台にした、スマートフォン向けシューティングパズルゲーム。",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/tokuhirom/iron-forge-engine.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "module",
+  "bugs": {
+    "url": "https://github.com/tokuhirom/iron-forge-engine/issues"
+  },
+  "homepage": "https://github.com/tokuhirom/iron-forge-engine#readme",
+  "dependencies": {
+    "phaser": "^3.90.0"
+  },
+  "devDependencies": {
+    "typescript": "^5.9.3",
+    "vite": "^7.3.1"
+  }
+}
