@@ -1,5 +1,6 @@
 import Phaser from "phaser";
-import { GAME_WIDTH, GAME_HEIGHT, COLORS } from "../constants";
+import { GAME_WIDTH, GAME_HEIGHT } from "../constants";
+import { resumeAudio } from "../audio";
 
 export class TitleScene extends Phaser.Scene {
   constructor() {
@@ -83,8 +84,12 @@ export class TitleScene extends Phaser.Scene {
       })
       .setOrigin(0.5);
 
-    this.input.once("pointerup", () => {
-      this.scene.start("GameScene");
+    // 少し遅延させてゲームオーバー画面からのタップ誤爆を防止
+    this.time.delayedCall(500, () => {
+      this.input.once("pointerup", () => {
+        resumeAudio();
+        this.scene.start("GameScene");
+      });
     });
   }
 }
