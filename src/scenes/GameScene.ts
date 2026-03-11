@@ -335,48 +335,48 @@ export class GameScene extends Phaser.Scene {
     });
   }
 
-  /** 仮想パッド: 画面下部に左右ボタン+発射ボタン */
+  /** 仮想パッド: 砲台と同じ高さに左右ボタン+発射ボタン */
   private setupVpadInput(): void {
-    const padY = CANNON_Y + CANNON_HEIGHT / 2 + 20;
-    const padAlpha = 0.5;
-    const btnSize = 50;
+    const padY = CANNON_Y;
+    const btnW = 50;
+    const btnH = 40;
 
-    // 左ボタン（タップで1マス移動）
-    const leftBtn = this.add.text(20, padY, "\u25C0", {
-      fontSize: "32px", color: "#aabbcc",
-      resolution: this.textRes,
-    }).setOrigin(0, 0.5).setDepth(50).setAlpha(padAlpha)
-      .setInteractive({ useHandCursor: true });
+    // 左ボタン
+    this.add.rectangle(30, padY, btnW, btnH, 0x334455, 0.8)
+      .setDepth(50).setStrokeStyle(1, 0x556677)
+      .setInteractive({ useHandCursor: true })
+      .on("pointerdown", () => {
+        if (this.gameOver || this.paused) return;
+        this.moveCannon(-1);
+      });
+    this.add.text(30, padY, "\u25C0", {
+      fontSize: "22px", color: "#aabbcc", resolution: this.textRes,
+    }).setOrigin(0.5).setDepth(51);
 
-    leftBtn.on("pointerdown", () => {
-      if (this.gameOver || this.paused) return;
-      this.moveCannon(-1);
-    });
-
-    // 右ボタン（タップで1マス移動）
-    const rightBtn = this.add.text(20 + btnSize + 10, padY, "\u25B6", {
-      fontSize: "32px", color: "#aabbcc",
-      resolution: this.textRes,
-    }).setOrigin(0, 0.5).setDepth(50).setAlpha(padAlpha)
-      .setInteractive({ useHandCursor: true });
-
-    rightBtn.on("pointerdown", () => {
-      if (this.gameOver || this.paused) return;
-      this.moveCannon(1);
-    });
+    // 右ボタン
+    this.add.rectangle(90, padY, btnW, btnH, 0x334455, 0.8)
+      .setDepth(50).setStrokeStyle(1, 0x556677)
+      .setInteractive({ useHandCursor: true })
+      .on("pointerdown", () => {
+        if (this.gameOver || this.paused) return;
+        this.moveCannon(1);
+      });
+    this.add.text(90, padY, "\u25B6", {
+      fontSize: "22px", color: "#aabbcc", resolution: this.textRes,
+    }).setOrigin(0.5).setDepth(51);
 
     // 発射ボタン
-    const fireBtn = this.add.text(GAME_WIDTH - 20, padY, "FIRE", {
-      fontFamily: "monospace", fontSize: "22px", color: "#ff8844",
-      stroke: "#000000", strokeThickness: 2,
+    this.add.rectangle(GAME_WIDTH - 50, padY, 80, btnH, 0x553322, 0.8)
+      .setDepth(50).setStrokeStyle(1, 0x886644)
+      .setInteractive({ useHandCursor: true })
+      .on("pointerdown", () => {
+        if (this.gameOver || this.paused) return;
+        this.shoot();
+      });
+    this.add.text(GAME_WIDTH - 50, padY, "FIRE", {
+      fontFamily: "monospace", fontSize: "18px", color: "#ff8844",
       resolution: this.textRes,
-    }).setOrigin(1, 0.5).setDepth(50).setAlpha(padAlpha)
-      .setInteractive({ useHandCursor: true });
-
-    fireBtn.on("pointerdown", () => {
-      if (this.gameOver || this.paused) return;
-      this.shoot();
-    });
+    }).setOrigin(0.5).setDepth(51);
   }
 
   /** 砲台を指定方向に1マス移動 */
