@@ -170,7 +170,7 @@ export class TitleScene extends Phaser.Scene {
         GAME_WIDTH / 2, 580, 180, 36, 0x223344, 1
       ).setStrokeStyle(1, 0x445566).setInteractive({ useHandCursor: true });
 
-      const fsText = this.add.text(GAME_WIDTH / 2, 580, "\u26F6 フルスクリーン", {
+      this.add.text(GAME_WIDTH / 2, 580, "\u26F6 フルスクリーン", {
         fontFamily: "'Hiragino Kaku Gothic ProN', 'Noto Sans JP', sans-serif",
         fontSize: "13px", color: "#8899aa",
         resolution: this.textRes,
