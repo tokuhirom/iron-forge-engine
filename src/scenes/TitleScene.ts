@@ -163,9 +163,31 @@ export class TitleScene extends Phaser.Scene {
       this.startGame();
     });
 
+    // フルスクリーンボタン（PWAモードでなく、Fullscreen APIが使える場合のみ表示）
+    const isPwa = window.matchMedia("(display-mode: standalone)").matches;
+    if (!isPwa && document.documentElement.requestFullscreen) {
+      const fsBg = this.add.rectangle(
+        GAME_WIDTH / 2, 580, 180, 36, 0x223344, 1
+      ).setStrokeStyle(1, 0x445566).setInteractive({ useHandCursor: true });
+
+      const fsText = this.add.text(GAME_WIDTH / 2, 580, "\u26F6 フルスクリーン", {
+        fontFamily: "'Hiragino Kaku Gothic ProN', 'Noto Sans JP', sans-serif",
+        fontSize: "13px", color: "#8899aa",
+        resolution: this.textRes,
+      }).setOrigin(0.5);
+
+      fsBg.on("pointerdown", () => {
+        if (!document.fullscreenElement) {
+          document.documentElement.requestFullscreen().catch(() => {});
+        } else {
+          document.exitFullscreen().catch(() => {});
+        }
+      });
+    }
+
     // ビルド情報
     this.add
-      .text(GAME_WIDTH / 2, 580, `${__BUILD_DATE__} (${__COMMIT_HASH__})`, {
+      .text(GAME_WIDTH / 2, 610, `${__BUILD_DATE__} (${__COMMIT_HASH__})`, {
         fontFamily: "monospace",
         fontSize: "10px",
         color: "#555566",

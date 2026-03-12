@@ -1,0 +1,17 @@
+{
+  "name": "鉄塊機関 ―IRON FORGE ENGINE―",
+  "short_name": "鉄塊機関",
+  "description": "スチームパンク風シューティングパズルゲーム",
+  "start_url": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#1a1a2e",
+  "theme_color": "#1a1a2e",
+  "icons": [
+    {
+      "src": "./icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml"
+    }
+  ]
+}
