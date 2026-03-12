@@ -28,7 +28,6 @@ export const MIN_RECT_AREA = 4;
 
 // スコア
 export const BASE_SCORE = 100;
-export const CHAIN_MULTIPLIER = 1.5;
 
 // スクラップ形状（矩形の一部が欠けた形）
 // filled: 最初から埋まっているセル [row, col]

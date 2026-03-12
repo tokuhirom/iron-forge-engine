@@ -9,6 +9,23 @@ function getAudioCtx(): AudioContext {
   return audioCtx;
 }
 
+/** オシレーター+ゲインノードを作成し接続して返す */
+function createNote(ctx: AudioContext, type: OscillatorType, freq: number, vol: number, startTime: number, dur: number, freqEnd?: number): void {
+  const osc = ctx.createOscillator();
+  const gain = ctx.createGain();
+  osc.connect(gain);
+  gain.connect(ctx.destination);
+  osc.type = type;
+  osc.frequency.setValueAtTime(freq, startTime);
+  if (freqEnd !== undefined) {
+    osc.frequency.exponentialRampToValueAtTime(freqEnd, startTime + dur);
+  }
+  gain.gain.setValueAtTime(vol, startTime);
+  gain.gain.exponentialRampToValueAtTime(0.001, startTime + dur);
+  osc.start(startTime);
+  osc.stop(startTime + dur);
+}
+
 /** ユーザー操作時に AudioContext を resume する（ブラウザ制限対策） */
 export function resumeAudio(): void {
   const ctx = getAudioCtx();
@@ -46,38 +63,14 @@ export function restoreMuteSetting(): void {
 export function playShoot(): void {
   if (muted) return;
   const ctx = getAudioCtx();
-  const osc = ctx.createOscillator();
-  const gain = ctx.createGain();
-  osc.connect(gain);
-  gain.connect(ctx.destination);
-
-  osc.type = "square";
-  osc.frequency.setValueAtTime(440, ctx.currentTime);
-  osc.frequency.exponentialRampToValueAtTime(220, ctx.currentTime + 0.08);
-  gain.gain.setValueAtTime(0.15, ctx.currentTime);
-  gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.1);
-
-  osc.start(ctx.currentTime);
-  osc.stop(ctx.currentTime + 0.1);
+  createNote(ctx, "square", 440, 0.15, ctx.currentTime, 0.1, 220);
 }
 
 /** 着弾音: 「カチッ」 */
 export function playLand(): void {
   if (muted) return;
   const ctx = getAudioCtx();
-  const osc = ctx.createOscillator();
-  const gain = ctx.createGain();
-  osc.connect(gain);
-  gain.connect(ctx.destination);
-
-  osc.type = "triangle";
-  osc.frequency.setValueAtTime(800, ctx.currentTime);
-  osc.frequency.exponentialRampToValueAtTime(400, ctx.currentTime + 0.05);
-  gain.gain.setValueAtTime(0.2, ctx.currentTime);
-  gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.08);
-
-  osc.start(ctx.currentTime);
-  osc.stop(ctx.currentTime + 0.08);
+  createNote(ctx, "triangle", 800, 0.2, ctx.currentTime, 0.08, 400);
 }
 
 /** 出荷音: 上昇する「ピロリン」 */
@@ -90,19 +83,8 @@ export function playShip(big: boolean): void {
     : [523, 659, 784]; // C5 E5 G5
 
   notes.forEach((freq, i) => {
-    const osc = ctx.createOscillator();
-    const gain = ctx.createGain();
-    osc.connect(gain);
-    gain.connect(ctx.destination);
-
-    osc.type = "sine";
     const t = ctx.currentTime + i * 0.08;
-    osc.frequency.setValueAtTime(freq, t);
-    gain.gain.setValueAtTime(0.2, t);
-    gain.gain.exponentialRampToValueAtTime(0.001, t + 0.15);
-
-    osc.start(t);
-    osc.stop(t + 0.15);
+    createNote(ctx, "sine", freq, 0.2, t, 0.15);
   });
 }
 
@@ -112,34 +94,12 @@ export function playSpeedUp(): void {
   const ctx = getAudioCtx();
 
   // 警告的な上昇音を3段
-  const freqs = [330, 440, 660];
-  freqs.forEach((freq, i) => {
-    const t = ctx.currentTime + i * 0.1;
-    const osc = ctx.createOscillator();
-    const gain = ctx.createGain();
-    osc.connect(gain);
-    gain.connect(ctx.destination);
-    osc.type = "square";
-    osc.frequency.setValueAtTime(freq, t);
-    gain.gain.setValueAtTime(0.2, t);
-    gain.gain.exponentialRampToValueAtTime(0.001, t + 0.12);
-    osc.start(t);
-    osc.stop(t + 0.12);
+  [330, 440, 660].forEach((freq, i) => {
+    createNote(ctx, "square", freq, 0.2, ctx.currentTime + i * 0.1, 0.12);
   });
 
   // 最後にアクセント
-  const t = ctx.currentTime + 0.35;
-  const osc = ctx.createOscillator();
-  const gain = ctx.createGain();
-  osc.connect(gain);
-  gain.connect(ctx.destination);
-  osc.type = "sawtooth";
-  osc.frequency.setValueAtTime(880, t);
-  osc.frequency.exponentialRampToValueAtTime(440, t + 0.15);
-  gain.gain.setValueAtTime(0.15, t);
-  gain.gain.exponentialRampToValueAtTime(0.001, t + 0.2);
-  osc.start(t);
-  osc.stop(t + 0.2);
+  createNote(ctx, "sawtooth", 880, 0.15, ctx.currentTime + 0.35, 0.2, 440);
 }
 
 // --- BGM ---
@@ -188,13 +148,11 @@ function scheduleBGMLoop(): void {
 // タブが非表示になったらBGMを一時停止、表示されたら再開
 document.addEventListener("visibilitychange", () => {
   if (document.hidden) {
-    // タブ非表示 → interval停止（音は自然に止まる）
     if (bgmInterval !== null) {
       clearInterval(bgmInterval);
       bgmInterval = null;
     }
   } else {
-    // タブ表示 → 再開（bgmPlayingがtrueの場合のみ）
     if (bgmPlaying && bgmInterval === null) {
       scheduleBGMLoop();
     }
@@ -226,8 +184,7 @@ function playBGMBar(): void {
   ];
 
   // ベースライン（機械的な反復音）
-  const bassNotes = [55, 55, 65, 55];
-  bassNotes.forEach((freq, i) => {
+  [55, 55, 65, 55].forEach((freq, i) => {
     const t = ctx.currentTime + beatSec * i;
     const osc = ctx.createOscillator();
     const gain = ctx.createGain();
@@ -244,19 +201,7 @@ function playBGMBar(): void {
 
   for (const p of pattern) {
     const t = ctx.currentTime + p.time;
-    const osc = ctx.createOscillator();
-    const gain = ctx.createGain();
-    osc.connect(gain);
-    gain.connect(ctx.destination);
-    osc.type = p.type;
-    osc.frequency.setValueAtTime(p.freq, t);
-    if (p.freq < 200) {
-      osc.frequency.exponentialRampToValueAtTime(p.freq * 0.5, t + p.dur);
-    }
-    gain.gain.setValueAtTime(p.vol, t);
-    gain.gain.exponentialRampToValueAtTime(0.001, t + p.dur);
-    osc.start(t);
-    osc.stop(t + p.dur);
+    createNote(ctx, p.type, p.freq, p.vol, t, p.dur, p.freq < 200 ? p.freq * 0.5 : undefined);
   }
 }
 
@@ -267,44 +212,11 @@ export function playGameOver(): void {
 
   for (let i = 0; i < 3; i++) {
     const t = ctx.currentTime + i * 0.45;
-
     // メイン低音（重い打撃感）
-    const osc1 = ctx.createOscillator();
-    const gain1 = ctx.createGain();
-    osc1.connect(gain1);
-    gain1.connect(ctx.destination);
-    osc1.type = "sawtooth";
-    osc1.frequency.setValueAtTime(80 - i * 10, t);
-    osc1.frequency.exponentialRampToValueAtTime(30, t + 0.5);
-    gain1.gain.setValueAtTime(0.25, t);
-    gain1.gain.exponentialRampToValueAtTime(0.001, t + 0.6);
-    osc1.start(t);
-    osc1.stop(t + 0.6);
-
+    createNote(ctx, "sawtooth", 80 - i * 10, 0.25, t, 0.6, 30);
     // サブ低音（厚みを出す）
-    const osc2 = ctx.createOscillator();
-    const gain2 = ctx.createGain();
-    osc2.connect(gain2);
-    gain2.connect(ctx.destination);
-    osc2.type = "square";
-    osc2.frequency.setValueAtTime(55 - i * 5, t);
-    osc2.frequency.exponentialRampToValueAtTime(20, t + 0.4);
-    gain2.gain.setValueAtTime(0.12, t);
-    gain2.gain.exponentialRampToValueAtTime(0.001, t + 0.5);
-    osc2.start(t);
-    osc2.stop(t + 0.5);
-
+    createNote(ctx, "square", 55 - i * 5, 0.12, t, 0.5, 20);
     // ノイズ的なアタック感
-    const osc3 = ctx.createOscillator();
-    const gain3 = ctx.createGain();
-    osc3.connect(gain3);
-    gain3.connect(ctx.destination);
-    osc3.type = "sawtooth";
-    osc3.frequency.setValueAtTime(200, t);
-    osc3.frequency.exponentialRampToValueAtTime(40, t + 0.08);
-    gain3.gain.setValueAtTime(0.18, t);
-    gain3.gain.exponentialRampToValueAtTime(0.001, t + 0.1);
-    osc3.start(t);
-    osc3.stop(t + 0.1);
+    createNote(ctx, "sawtooth", 200, 0.18, t, 0.1, 40);
   }
 }

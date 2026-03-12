@@ -200,22 +200,24 @@ export class GameScene extends Phaser.Scene {
   private pauseOverlay: Phaser.GameObjects.Rectangle | null = null;
   private pauseText: Phaser.GameObjects.Text | null = null;
 
-  private pauseGame(): void {
-    this.paused = true;
-    stopBGM();
-
-    // ブロックを隠す（考えられないように）
+  private setBlocksVisible(visible: boolean): void {
     for (let r = 0; r < GRID_ROWS; r++) {
       for (let c = 0; c < GRID_COLS; c++) {
         const block = this.grid[r][c];
-        if (block) block.setVisible(false);
+        if (block) block.setVisible(visible);
       }
     }
-    this.outlineGraphics.setVisible(false);
-    this.aimLineGraphics.setVisible(false);
+    this.outlineGraphics.setVisible(visible);
+    this.aimLineGraphics.setVisible(visible);
     for (const fb of this.flyingBlocks) {
-      fb.sprite.setVisible(false);
+      fb.sprite.setVisible(visible);
     }
+  }
+
+  private pauseGame(): void {
+    this.paused = true;
+    stopBGM();
+    this.setBlocksVisible(false);
 
     // オーバーレイ
     this.pauseOverlay = this.add.rectangle(
@@ -238,19 +240,7 @@ export class GameScene extends Phaser.Scene {
 
   private resumeGame(): void {
     this.paused = false;
-
-    // ブロックを再表示
-    for (let r = 0; r < GRID_ROWS; r++) {
-      for (let c = 0; c < GRID_COLS; c++) {
-        const block = this.grid[r][c];
-        if (block) block.setVisible(true);
-      }
-    }
-    this.outlineGraphics.setVisible(true);
-    this.aimLineGraphics.setVisible(true);
-    for (const fb of this.flyingBlocks) {
-      fb.sprite.setVisible(true);
-    }
+    this.setBlocksVisible(true);
 
     // オーバーレイ削除
     if (this.pauseOverlay) { this.pauseOverlay.destroy(); this.pauseOverlay = null; }
@@ -494,19 +484,26 @@ export class GameScene extends Phaser.Scene {
     };
     this.groups.set(groupId, group);
 
-    for (const [dr, dc] of shape.filled) {
-      const r = startRow + dr;
-      const c = startCol + dc;
+    this.placeShapeOnGrid(shape.filled, startRow, startCol, groupId, COLORS.scrap, 0x445566);
+    this.redrawOutlines();
+    return group;
+  }
+
+  /** シェイプのセルをグリッドに配置する */
+  private placeShapeOnGrid(
+    filled: [number, number][], startRow: number, startCol: number,
+    groupId: number, color: number, strokeColor: number,
+  ): void {
+    for (const [dr, dc] of filled) {
+      const r = startRow + dr, c = startCol + dc;
       this.gridState[r][c] = groupId;
       const rect = this.add.rectangle(
         c * CELL_SIZE + CELL_SIZE / 2, r * CELL_SIZE + CELL_SIZE / 2,
-        CELL_SIZE - 2, CELL_SIZE - 2, COLORS.scrap
+        CELL_SIZE - 2, CELL_SIZE - 2, color
       );
-      rect.setStrokeStyle(1, 0x445566);
+      rect.setStrokeStyle(1, strokeColor);
       this.grid[r][c] = rect;
     }
-    this.redrawOutlines();
-    return group;
   }
 
   /** 複合スポーン: 2つのグループを縦に重ねて配置 */
@@ -518,8 +515,6 @@ export class GameScene extends Phaser.Scene {
     if (maxW > GRID_COLS) { this.spawnSingleGroup(0); return; }
     const startCol = Phaser.Math.Between(0, GRID_COLS - maxW);
 
-    // 上のグループ (group2) → row 0
-    // 下のグループ (group1) → row shape2.h（直下）
     const row2 = 0;
     const row1 = shape2.h;
 
@@ -535,35 +530,17 @@ export class GameScene extends Phaser.Scene {
       if (r >= GRID_ROWS || c >= GRID_COLS || this.gridState[r][c] !== 0) { this.spawnSingleGroup(0); return; }
     }
 
-    // 下のグループ (先に消す必要がある)
+    // 下のグループ
     const gid1 = this.nextGroupId++;
     const group1: ScrapGroup = { id: gid1, r: row1, c: startCol, w: shape1.w, h: shape1.h };
     this.groups.set(gid1, group1);
-    for (const [dr, dc] of shape1.filled) {
-      const r = row1 + dr, c = startCol + dc;
-      this.gridState[r][c] = gid1;
-      const rect = this.add.rectangle(
-        c * CELL_SIZE + CELL_SIZE / 2, r * CELL_SIZE + CELL_SIZE / 2,
-        CELL_SIZE - 2, CELL_SIZE - 2, COLORS.scrap
-      );
-      rect.setStrokeStyle(1, 0x445566);
-      this.grid[r][c] = rect;
-    }
+    this.placeShapeOnGrid(shape1.filled, row1, startCol, gid1, COLORS.scrap, 0x445566);
 
     // 上のグループ
     const gid2 = this.nextGroupId++;
     const group2: ScrapGroup = { id: gid2, r: row2, c: startCol, w: shape2.w, h: shape2.h };
     this.groups.set(gid2, group2);
-    for (const [dr, dc] of shape2.filled) {
-      const r = row2 + dr, c = startCol + dc;
-      this.gridState[r][c] = gid2;
-      const rect = this.add.rectangle(
-        c * CELL_SIZE + CELL_SIZE / 2, r * CELL_SIZE + CELL_SIZE / 2,
-        CELL_SIZE - 2, CELL_SIZE - 2, 0x778899 // 少し色を変えて区別
-      );
-      rect.setStrokeStyle(1, 0x556677);
-      this.grid[r][c] = rect;
-    }
+    this.placeShapeOnGrid(shape2.filled, row2, startCol, gid2, 0x778899, 0x556677);
 
     this.redrawOutlines();
   }
